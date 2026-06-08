@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Survival Analysis — Budget Tech Peripherals</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Syne:wght@400;500;600;700;800&family=DM+Mono:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#05050a;--bg2:#0a0a12;
+  --accent:#d4ff1e;--accent2:#1effd4;--accent3:#ff501e;
+  --text:#eeeef0;--text2:#8888a0;--text3:#444458;
+  --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.12);
+  --card:rgba(255,255,255,0.03);--card2:rgba(255,255,255,0.055);
+  --radius:20px;--radius2:12px;
+}
+html{scroll-behavior:smooth;cursor:none}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:16px;line-height:1.6;min-height:100vh;overflow-x:hidden}
+
+/* ── CURSOR ── */
+#cur{position:fixed;width:10px;height:10px;background:var(--accent);border-radius:50%;pointer-events:none;z-index:99999;transform:translate(-50%,-50%);transition:width .18s,height .18s;mix-blend-mode:exclusion}
+#cur-ring{position:fixed;width:40px;height:40px;border:1.5px solid rgba(212,255,30,0.38);border-radius:50%;pointer-events:none;z-index:99998;transform:translate(-50%,-50%);transition:width .3s,height .3s,border-color .3s}
+#cur.drag{width:6px;height:6px}
+#cur-ring.drag{width:56px;height:56px;border-color:rgba(212,255,30,.6)}
+
+/* ── CANVAS ── */
+#bgCanvas{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.7}
+section{position:relative;z-index:2}
+
+/* ══ HERO ══ */
+#hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:2rem;overflow:hidden}
+.hero-pill{display:inline-flex;align-items:center;gap:10px;border:1px solid rgba(212,255,30,.25);border-radius:999px;padding:7px 20px;font-family:'DM Mono',monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:2.5rem;opacity:0;animation:fadeUp .7s .3s ease forwards;background:rgba(212,255,30,.05)}
+.hero-pill-dot{width:7px;height:7px;background:var(--accent);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.hero-h1{font-family:'Syne',sans-serif;font-size:clamp(3.5rem,10vw,9rem);font-weight:800;line-height:.88;letter-spacing:-.04em;opacity:0;animation:fadeUp .8s .5s ease forwards}
+.h1-line{display:block}.h1-accent{color:var(--accent)}
+.h1-dim{color:var(--text2);font-weight:400;font-size:.38em;font-family:'Space Grotesk',sans-serif;letter-spacing:-.01em;display:block;margin-top:.5em;line-height:1.3}
+.hero-desc{font-size:1rem;color:var(--text2);max-width:420px;margin:2rem auto;line-height:1.75;opacity:0;animation:fadeUp .7s .8s ease forwards}
+.hero-cta{display:inline-flex;align-items:center;gap:12px;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:.95rem;border:none;border-radius:999px;padding:.9rem 2.25rem;cursor:none;transition:transform .3s,box-shadow .3s;opacity:0;animation:fadeUp .7s 1s ease forwards}
+.hero-cta:hover{transform:scale(1.04);box-shadow:0 0 60px rgba(212,255,30,.35)}
+.hero-scroll-hint{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--text3);font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.12em;text-transform:uppercase;opacity:0;animation:fadeUp .6s 1.5s ease forwards}
+.scroll-track{width:1px;height:48px;background:linear-gradient(var(--text3),transparent);animation:scrollDrop 2.2s ease-in-out infinite;transform-origin:top}
+@keyframes scrollDrop{0%{transform:scaleY(0);opacity:1}50%{transform:scaleY(1);opacity:1}100%{transform:scaleY(1);opacity:0}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+
+/* ══ SELECTION ══ */
+#sel-page{padding:7rem 2rem 5rem;min-height:100vh}
+.mono-label{font-family:'DM Mono',monospace;font-size:10.5px;letter-spacing:.15em;text-transform:uppercase;color:var(--accent);margin-bottom:.5rem}
+.big-title{font-family:'Syne',sans-serif;font-size:clamp(2rem,4.5vw,3.8rem);font-weight:700;letter-spacing:-.025em;line-height:1.05;margin-bottom:1rem}
+.page-desc{font-size:.92rem;color:var(--text2);max-width:500px;line-height:1.75;margin-bottom:3rem}
+.revealed{opacity:1!important;transform:translateY(0)!important;transition:opacity .7s ease,transform .7s ease!important}
+.will-reveal{opacity:0;transform:translateY(32px)}
+.wrap{max-width:1120px;margin:0 auto}
+
+/* ── DEVICE GRID ── */
+.dev-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:1rem;margin-bottom:3rem}
+.dev-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;cursor:none;transition:border-color .25s,background .25s,transform .25s;overflow:hidden;user-select:none}
+.dev-card-glow{position:absolute;inset:0;border-radius:var(--radius);background:radial-gradient(circle at var(--gx,50%) var(--gy,50%),rgba(212,255,30,.07) 0%,transparent 55%);opacity:0;transition:opacity .3s;pointer-events:none}
+.dev-card:hover .dev-card-glow{opacity:1}
+.dev-card:hover{border-color:rgba(212,255,30,.28);transform:translateY(-3px)}
+.dev-card.sel{border-color:var(--accent);background:rgba(212,255,30,.04)}
+.dev-check{position:absolute;top:1rem;right:1rem;width:22px;height:22px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#000;transform:scale(0);transition:transform .25s cubic-bezier(.34,1.56,.64,1)}
+.dev-card.sel .dev-check{transform:scale(1)}
+.dev-ico{font-size:2.4rem;display:block;margin-bottom:1rem;transition:transform .3s}
+.dev-card:hover .dev-ico,.dev-card.sel .dev-ico{transform:scale(1.08) rotate(-3deg)}
+.dev-name{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:700;margin-bottom:.35rem}
+.dev-why{font-size:.8rem;color:var(--text2);line-height:1.5}
+.dev-fail{margin-top:.75rem;padding-top:.75rem;border-top:1px solid var(--border);font-size:.72rem;font-family:'DM Mono',monospace;color:var(--text3);line-height:1.6}
+.dev-fail-lbl{color:var(--accent3);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
+
+/* ── CTA ROW ── */
+.cta-row{display:flex;align-items:center;gap:1.25rem;flex-wrap:wrap}
+.main-btn{display:inline-flex;align-items:center;gap:10px;padding:.9rem 2rem;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:.92rem;border:none;border-radius:999px;cursor:none;transition:transform .3s,box-shadow .3s,opacity .3s}
+.main-btn:disabled{opacity:.25;pointer-events:none}
+.main-btn:hover{transform:scale(1.03);box-shadow:0 0 40px rgba(212,255,30,.28)}
+.count-pill{background:rgba(0,0,0,.2);border-radius:999px;padding:2px 10px;font-size:.82rem}
+.helper-txt{font-size:.8rem;color:var(--text3);font-family:'DM Mono',monospace}
+
+/* ══ TRANSITION OVERLAY ══ */
+#t-overlay{position:fixed;inset:0;z-index:5000;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;opacity:0;background:var(--bg)}
+#t-overlay.on{pointer-events:all}
+.t-burst{position:relative;display:flex;align-items:center;justify-content:center;width:220px;height:220px}
+.t-ring{position:absolute;border-radius:50%;border:2px solid var(--accent);opacity:0;animation:none;width:100%;height:100%}
+.t-ring.r2{border-color:var(--accent2)}.t-ring.r3{border-color:var(--accent3)}
+@keyframes ringBurst{0%{transform:scale(.4);opacity:.9}100%{transform:scale(3);opacity:0}}
+.t-emoji{font-size:7rem;transform:scale(0);animation:none;position:relative;z-index:2;filter:drop-shadow(0 0 40px rgba(212,255,30,.5))}
+@keyframes emojiBoom{0%{transform:scale(0) rotate(-15deg);opacity:0}55%{transform:scale(1.25) rotate(6deg);opacity:1}100%{transform:scale(1) rotate(0deg);opacity:1}}
+.t-name{font-family:'Syne',sans-serif;font-size:2.8rem;font-weight:800;letter-spacing:-.03em;color:var(--accent);text-align:center;opacity:0;transform:translateY(16px)}
+.t-sub{font-family:'DM Mono',monospace;font-size:.82rem;color:var(--text2);letter-spacing:.06em;opacity:0;transform:translateY(12px);margin-top:.5rem}
+
+/* ══ SURVEY PAGE ══ */
+#surv-page{display:none;min-height:100vh}
+.surv-wrap{max-width:700px;margin:0 auto;padding:4rem 2rem 7rem}
+.surv-prog-bar{display:flex;align-items:center;gap:12px;margin-bottom:3rem}
+.prog-lbl{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:.12em;white-space:nowrap}
+.prog-track{flex:1;height:2px;background:var(--border2);border-radius:99px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);transition:width .6s cubic-bezier(.4,0,.2,1)}
+.prog-pct{font-family:'DM Mono',monospace;font-size:10px;color:var(--accent);white-space:nowrap}
+.dev-header{display:flex;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);margin-bottom:3rem}
+.dev-hdr-ico{font-size:2.75rem}
+.dev-hdr-name{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:700}
+.dev-hdr-meta{font-family:'DM Mono',monospace;font-size:.72rem;color:var(--text3);margin-top:3px}
+
+/* ── QUESTIONS ── */
+.q-list{display:flex;flex-direction:column;gap:2.25rem}
+.q-block{opacity:0;transform:translateY(20px)}
+.q-block.in{opacity:1;transform:translateY(0);transition:opacity .5s ease,transform .5s ease}
+.q-mono{font-family:'DM Mono',monospace;font-size:.68rem;color:var(--accent2);letter-spacing:.12em;text-transform:uppercase;margin-bottom:.45rem}
+.q-main{font-family:'Syne',sans-serif;font-size:1.05rem;font-weight:600;color:var(--text);line-height:1.4;margin-bottom:.85rem}
+.q-hint{font-size:.8rem;color:var(--text2);margin-bottom:.9rem;line-height:1.6}
+
+/* RADIO */
+.radio-group{display:flex;flex-direction:column;gap:.45rem}
+.r-opt{display:flex;align-items:center;gap:12px;padding:.8rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);cursor:none;transition:border-color .2s,background .2s;font-size:.88rem}
+.r-opt input{display:none}
+.r-dot{width:17px;height:17px;flex-shrink:0;border:1.5px solid var(--border2);border-radius:50%;position:relative;transition:all .2s}
+.r-opt:has(input:checked){border-color:var(--accent);background:rgba(212,255,30,.04)}
+.r-opt:has(input:checked) .r-dot{border-color:var(--accent);background:var(--accent)}
+.r-opt:has(input:checked) .r-dot::after{content:'';position:absolute;inset:4px;background:#000;border-radius:50%}
+.r-opt:hover:not(:has(input:checked)){border-color:var(--border2);background:var(--card2)}
+
+/* CHECKBOX */
+.chk-group{display:flex;flex-direction:column;gap:.45rem}
+.c-opt{display:flex;align-items:flex-start;gap:12px;padding:.8rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);cursor:none;transition:border-color .2s,background .2s;font-size:.88rem;line-height:1.45}
+.c-opt input{display:none}
+.c-box{width:17px;height:17px;flex-shrink:0;margin-top:2px;border:1.5px solid var(--border2);border-radius:4px;position:relative;transition:all .2s}
+.c-opt:has(input:checked){border-color:var(--accent);background:rgba(212,255,30,.04)}
+.c-opt:has(input:checked) .c-box{border-color:var(--accent);background:var(--accent)}
+.c-opt:has(input:checked) .c-box::after{content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10.5px;color:#000;font-weight:700}
+.c-opt:hover:not(:has(input:checked)){border-color:var(--border2);background:var(--card2)}
+
+/* DATE */
+.date-row{display:flex;gap:.75rem;flex-wrap:wrap}
+.d-sel{flex:1;min-width:130px;padding:.8rem 1rem;background:var(--card);border:1px solid var(--border);border-radius:var(--radius2);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:.88rem;outline:none;transition:border-color .2s;appearance:none;cursor:none}
+.d-sel:focus{border-color:var(--accent)}
+.d-sel option{background:#0a0a12}
+
+/* ═══════════════════════════════
+   SCALE SLIDER — THE BIG ONE
+═══════════════════════════════ */
+.scale-wrap{
+  position:relative;
+  padding:1.5rem 0 .5rem;
+  user-select:none;
+}
+
+/* Track container */
+.scale-track-container{
+  position:relative;height:6px;
+  border-radius:999px;
+  background:var(--border2);
+  cursor:none;
+  transition:height .28s cubic-bezier(.34,1.2,.64,1);
+}
+.scale-track-container.active{height:22px}
+
+/* Filled portion */
+.scale-fill{
+  position:absolute;left:0;top:0;height:100%;
+  border-radius:999px;
+  background:linear-gradient(90deg,var(--accent2),var(--accent));
+  pointer-events:none;
+  transition:width .06s linear;
+}
+
+/* Thumb */
+.scale-thumb{
+  position:absolute;top:50%;
+  width:24px;height:24px;
+  border-radius:50%;
+  background:var(--accent);
+  border:3px solid #000;
+  transform:translate(-50%,-50%);
+  transition:width .28s cubic-bezier(.34,1.2,.64,1),
+             height .28s cubic-bezier(.34,1.2,.64,1),
+             box-shadow .28s ease;
+  pointer-events:none;
+  z-index:2;
+}
+.scale-track-container.active .scale-thumb{
+  width:42px;height:42px;
+  box-shadow:0 0 0 8px rgba(212,255,30,.18), 0 0 30px rgba(212,255,30,.35);
+}
+
+/* Value bubble */
+.scale-bubble{
+  position:absolute;
+  top:-38px;
+  transform:translateX(-50%);
+  background:var(--accent);
+  color:#000;
+  font-family:'Syne',sans-serif;
+  font-weight:700;
+  font-size:.82rem;
+  padding:4px 10px;
+  border-radius:8px;
+  white-space:nowrap;
+  pointer-events:none;
+  opacity:0;
+  transition:opacity .2s ease, top .28s cubic-bezier(.34,1.2,.64,1);
+  z-index:3;
+}
+.scale-bubble::after{
+  content:'';position:absolute;bottom:-5px;left:50%;
+  transform:translateX(-50%);
+  border:5px solid transparent;
+  border-top-color:var(--accent);
+  border-bottom:none;
+}
+.scale-track-container.active .scale-bubble{opacity:1;top:-46px}
+
+/* Tick marks + labels */
+.scale-ticks{
+  display:flex;justify-content:space-between;
+  margin-top:14px;padding:0 2px;
+}
+.scale-tick-item{
+  display:flex;flex-direction:column;align-items:center;
+  gap:4px;flex:1;
+}
+.scale-tick-line{
+  width:1px;height:6px;background:var(--border2);
+}
+.scale-tick-label{
+  font-family:'DM Mono',monospace;
+  font-size:.65rem;color:var(--text3);
+  text-align:center;line-height:1.3;
+  transition:color .2s;
+}
+.scale-tick-item.active .scale-tick-label{color:var(--accent)}
+.scale-tick-item.active .scale-tick-line{background:var(--accent)}
+
+/* End labels */
+.scale-ends{
+  display:flex;justify-content:space-between;
+  margin-top:.5rem;
+}
+.scale-end{
+  font-size:.75rem;color:var(--text2);line-height:1.4;
+  max-width:40%;
+}
+.scale-end:last-child{text-align:right}
+
+/* Current value readout */
+.scale-readout{
+  margin-top:.75rem;
+  font-family:'DM Mono',monospace;
+  font-size:.78rem;color:var(--text3);
+  transition:color .2s;
+  min-height:1.2em;
+}
+.scale-readout.lit{color:var(--accent)}
+
+.q-divider{border:none;border-top:1px solid var(--border);margin-top:2rem}
+
+/* SUBMIT */
+.sub-area{display:flex;justify-content:space-between;align-items:center;margin-top:3rem;padding-top:2rem;border-top:1px solid var(--border);gap:1rem;flex-wrap:wrap}
+.sub-note{font-size:.78rem;color:var(--text3);font-family:'DM Mono',monospace;line-height:1.5}
+.sub-btn{display:inline-flex;align-items:center;gap:8px;padding:.85rem 1.9rem;background:var(--accent);color:#000;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;border:none;border-radius:999px;cursor:none;transition:transform .3s,box-shadow .3s}
+.sub-btn:hover{transform:scale(1.03);box-shadow:0 0 35px rgba(212,255,30,.25)}
+
+/* ══ DONE ══ */
+#done-page{display:none;min-height:100vh;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4rem 2rem}
+.done-icon{font-size:5rem;animation:emojiBoom .9s cubic-bezier(.34,1.56,.64,1) both}
+.done-title{font-family:'Syne',sans-serif;font-size:clamp(2.5rem,6vw,5rem);font-weight:800;letter-spacing:-.04em;margin:1.5rem 0 1rem;line-height:1}
+.done-title em{color:var(--accent);font-style:normal}
+.done-desc{font-size:.95rem;color:var(--text2);max-width:440px;margin:0 auto 2rem;line-height:1.75}
+.done-chips{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;margin-bottom:2.5rem}
+.done-chip{display:flex;align-items:center;gap:6px;background:rgba(212,255,30,.08);border:1px solid rgba(212,255,30,.22);border-radius:999px;padding:5px 14px;font-family:'DM Mono',monospace;font-size:.8rem;color:var(--accent)}
+.sdg-card{display:flex;gap:1rem;align-items:flex-start;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius);padding:1.25rem 1.5rem;max-width:440px;text-align:left}
+.sdg-card-txt{font-size:.82rem;color:var(--text2);line-height:1.6}
+.sdg-card-title{color:var(--text);font-weight:600;margin-bottom:4px;font-size:.88rem}
+/* ── DEMOGRAPHICS INPUTS ── */
+.t-inp { width: 100%; padding: 1rem 1.25rem; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius2); color: var(--text); font-family: 'Space Grotesk', sans-serif; font-size: .95rem; outline: none; transition: border-color .2s, box-shadow .2s; cursor: none; margin-top: .5rem; }
+.t-inp:focus { border-color: var(--accent); background: rgba(212,255,30,.04); }
+.t-inp::placeholder { color: var(--text3); }
+.other-wrap { overflow: hidden; max-height: 0; transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; opacity: 0; }
+.other-wrap.active { max-height: 120px; opacity: 1; }
+#demo-page { padding: 7rem 2rem 5rem; min-height: 100vh; }
+</style>
+</head>
+<body>
+
+<div id="cur"></div>
+<div id="cur-ring"></div>
+<canvas id="bgCanvas"></canvas>
+
+<!-- TRANSITION OVERLAY -->
+<div id="t-overlay">
+  <div class="t-burst">
+    <div class="t-ring" id="tr1"></div>
+    <div class="t-ring r2" id="tr2"></div>
+    <div class="t-ring r3" id="tr3"></div>
+    <div class="t-emoji" id="t-emoji">🎧</div>
+  </div>
+  <div style="margin-top:1.5rem;display:flex;flex-direction:column;align-items:center;gap:.5rem">
+    <div class="t-name" id="t-name">TWS Earbuds</div>
+    <div class="t-sub" id="t-sub">Survey 1 of 3</div>
+  </div>
+</div>
+
+<!-- HERO -->
+<section id="hero">
+  <div style="position:relative;z-index:2">
+    <div class="hero-pill"><span class="hero-pill-dot"></span>SDG 12 · Responsible Consumption & Production</div>
+    <h1 class="hero-h1">
+      <span class="h1-line">Survival</span>
+      <span class="h1-line h1-accent">Analysis</span>
+      <span class="h1-dim">Budget Tech Peripherals · University Research</span>
+    </h1>
+    <p class="hero-desc">Your devices tell a story. Help us map the true lifespan of budget technology — one device at a time.</p>
+    <button class="hero-cta" onclick="goToDemo()">
+      Start the Survey
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="hero-scroll-hint"><div class="scroll-track"></div><span>scroll</span></div>
+</section>
+<section id="demo-page">
+  <div class="wrap" style="max-width:650px;">
+    <p class="mono-label will-reveal">Step 00 — Respondent Profile</p>
+    <h2 class="big-title will-reveal">Who is behind<br>the hardware?</h2>
+    <p class="page-desc will-reveal">Before we analyze your devices, we need a baseline demographic profile to contextualize the survival data.</p>
+
+    <div class="q-list will-reveal" style="margin-bottom: 3.5rem;">
+      
+      <div class="q-block in">
+        <div class="q-mono">Full Name</div>
+        <input type="text" id="demo-name" class="t-inp" placeholder="Enter your full name">
+      </div>
+      <div class="q-block in">
+        <div class="q-mono">Email Address</div>
+        <input type="email" id="demo-email" class="t-inp" placeholder="Enter your email address">
+        <div id="email-error" style="color: var(--accent3); font-size: .85rem; font-family: 'DM Mono', monospace; margin-top: .6rem; display: none; animation: fadeUp 0.3s ease forwards;"></div>
+      </div>
+
+      <div class="q-block in">
+        <div class="q-mono">Age Bracket</div>
+        <div class="radio-group">
+          <label class="r-opt"><input type="radio" name="demo-age" value="Under 18"><div class="r-dot"></div><span>Under 18</span></label>
+          <label class="r-opt"><input type="radio" name="demo-age" value="18–24"><div class="r-dot"></div><span>18–24</span></label>
+          <label class="r-opt"><input type="radio" name="demo-age" value="25–34"><div class="r-dot"></div><span>25–34</span></label>
+          <label class="r-opt"><input type="radio" name="demo-age" value="35–44"><div class="r-dot"></div><span>35–44</span></label>
+          <label class="r-opt"><input type="radio" name="demo-age" value="45+"><div class="r-dot"></div><span>45+</span></label>
+        </div>
+      </div>
+
+      <div class="q-block in">
+        <div class="q-mono">Gender</div>
+        <div class="radio-group">
+          <label class="r-opt"><input type="radio" name="demo-gender" value="Male"><div class="r-dot"></div><span>Male</span></label>
+          <label class="r-opt"><input type="radio" name="demo-gender" value="Female"><div class="r-dot"></div><span>Female</span></label>
+          <label class="r-opt"><input type="radio" name="demo-gender" value="Non-binary"><div class="r-dot"></div><span>Non-binary</span></label>
+          <label class="r-opt"><input type="radio" name="demo-gender" value="Prefer not to say"><div class="r-dot"></div><span>Prefer not to say</span></label>
+          <label class="r-opt"><input type="radio" name="demo-gender" value="Other"><div class="r-dot"></div><span>Other</span></label>
+        </div>
+        <div class="other-wrap" id="wrap-gender-other">
+          <input type="text" id="demo-gender-other" class="t-inp" placeholder="Please specify your gender">
+        </div>
+      </div>
+
+      <div class="q-block in">
+        <div class="q-mono">Primary Occupation</div>
+        <div class="radio-group">
+          <label class="r-opt"><input type="radio" name="demo-occ" value="Student"><div class="r-dot"></div><span>Student</span></label>
+          <label class="r-opt"><input type="radio" name="demo-occ" value="Teacher / Academic"><div class="r-dot"></div><span>Teacher / Academic</span></label>
+          <label class="r-opt"><input type="radio" name="demo-occ" value="Working Professional"><div class="r-dot"></div><span>Working Professional</span></label>
+          <label class="r-opt"><input type="radio" name="demo-occ" value="Business Owner"><div class="r-dot"></div><span>Business Owner</span></label>
+          <label class="r-opt"><input type="radio" name="demo-occ" value="Other"><div class="r-dot"></div><span>Other</span></label>
+        </div>
+        <div class="other-wrap" id="wrap-occ-other">
+          <input type="text" id="demo-occ-other" class="t-inp" placeholder="Please specify your occupation">
+        </div>
+      </div>
+
+      <div class="q-block in">
+        <div class="q-mono">Nationality</div>
+        <input type="text" id="demo-nat" class="t-inp" placeholder="Enter your nationality">
+      </div>
+
+    </div>
+
+    <button class="main-btn will-reveal" onclick="saveDemoAndGoToSel()">
+      Continue to Device Selection
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="margin-left:4px;"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+</section>
+<!-- SELECTION -->
+<section id="sel-page">
+  <div class="wrap">
+    <p class="mono-label will-reveal">Step 01 — Device Selection</p>
+    <h2 class="big-title will-reveal">Which devices have<br>you owned?</h2>
+    <p class="page-desc will-reveal">Select every device you currently use or have previously owned. Each gets its own focused survey.</p>
+    <div class="dev-grid" id="devGrid"></div>
+    <div class="cta-row">
+      <button class="main-btn" id="surveyBtn" onclick="startSurveys()" disabled>
+        Begin Surveys <span class="count-pill" id="cntBadge">0 selected</span>
+      </button>
+      <span class="helper-txt" id="helperTxt">Select at least one device</span>
+    </div>
+  </div>
+</section>
+
+<!-- SURVEY -->
+<section id="surv-page">
+  <div class="surv-wrap" id="survWrap"></div>
+</section>
+
+<!-- DONE -->
+<section id="done-page">
+  <div class="done-icon">🎉</div>
+  <h2 class="done-title">Survey <em>Complete</em></h2>
+  <p class="done-desc">Thank you. Your responses contribute to research on product longevity and sustainable consumption — pushing for more durable, repairable budget tech.</p>
+  <div class="done-chips" id="doneChips"></div>
+  <div class="sdg-card">
+    <div style="font-size:2rem;flex-shrink:0">🌱</div>
+    <div class="sdg-card-txt">
+      <div class="sdg-card-title">SDG 12 — Responsible Consumption & Production</div>
+      Your data helps quantify how long budget peripherals really last and informs recommendations for manufacturers, consumers, and policy makers.
+    </div>
+  </div>
+</section>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ══ CURSOR ══ */
+const cur=document.getElementById('cur'),ring=document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0,dragging=false;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cur.style.left=mx+'px';cur.style.top=my+'px'});
+(function lerp(){rx+=(mx-rx)*.13;ry+=(my-ry)*.13;ring.style.left=Math.round(rx)+'px';ring.style.top=Math.round(ry)+'px';requestAnimationFrame(lerp)})();
+
+/* ══ PARTICLE CANVAS ══ */
+(function(){
+  const cv=document.getElementById('bgCanvas'),ctx=cv.getContext('2d');
+  let W,H,pts=[];
+  function resize(){W=cv.width=window.innerWidth;H=cv.height=window.innerHeight}
+  resize();window.addEventListener('resize',resize);
+  for(let i=0;i<90;i++)pts.push({x:Math.random()*2000,y:Math.random()*2000,vx:(Math.random()-.5)*.18,vy:(Math.random()-.5)*.18,r:Math.random()*1.2+.3,o:Math.random()*.5+.15});
+  let scrollY=0;window.addEventListener('scroll',()=>{scrollY=window.scrollY});
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    const oy=scrollY*.08;
+    pts.forEach(p=>{
+      p.x+=p.vx;p.y+=p.vy;
+      if(p.x<0)p.x=2000;if(p.x>2000)p.x=0;if(p.y<0)p.y=2000;if(p.y>2000)p.y=0;
+      const sx=p.x%W,sy=(p.y+oy)%H;
+      ctx.beginPath();ctx.arc(sx,sy,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(212,255,30,${p.o})`;ctx.fill();
+    });
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
+      const a=pts[i],b=pts[j];
+      const sx1=a.x%W,sy1=(a.y+oy)%H,sx2=b.x%W,sy2=(b.y+oy)%H;
+      const d=Math.sqrt((sx1-sx2)**2+(sy1-sy2)**2);
+      if(d<110){ctx.beginPath();ctx.moveTo(sx1,sy1);ctx.lineTo(sx2,sy2);ctx.strokeStyle=`rgba(212,255,30,${(1-d/110)*.07})`;ctx.lineWidth=.5;ctx.stroke()}
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ══ SCROLL REVEAL ══ */
+const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('revealed')}),{threshold:.1});
+document.querySelectorAll('.will-reveal').forEach(el=>obs.observe(el));
+
+/* ══ MONTHS / YEARS ══ */
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const YEARS=[];for(let y=2013;y<=2025;y++)YEARS.push(y);
+
+/* ══════════════════════════════════════════════════
+   DEVICES DATA
+   Each device has:
+   - questions[] of type radio | checkbox | date | scale
+   scale shape: {id, type:'scale', lbl, q, hint?, min, max, step, minLbl, maxLbl, ticks[], unit?, readoutFn}
+══════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════
+   DEVICES DATA (UPDATED WITH SURVIVAL SCALES)
+══════════════════════════════════════════════════ */
+const DEVICES=[
+  /* ① TWS EARBUDS */
+  {id:'tws',name:'TWS Earbuds',icon:'🎧',
+   why:'Commuting, gym, blocking noisy roommates, online lectures',
+   fail:'Battery < 45 min · One earbud dead · Charging case failure',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you purchase this device?',hint:'Approximate month and year.'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'Approximately how much did you pay?',
+     opts:['Under ₹500','₹500 – ₹999','₹1,000 – ₹1,999','₹2,000 – ₹3,000']},
+    {id:'EBD1',type:'radio',lbl:'Brand',q:'Which brand are your TWS earbuds?',
+     opts:['Boat','Noise','Boult Audio','Mivi','Portronics','PTron','Zebronics','Sony','Samsung','Other / Local Brand']},
+    {id:'EBD2',type:'radio',lbl:'Current Status',q:'What is the current status of this device?',
+     opts:['Still working perfectly','Working but degraded','Broken / Failed','Lost it','Replaced / Upgraded']},
+    {id:'EBD4',type:'radio',lbl:'Failure Mode',q:'If the device failed, what was the primary failure mode?',
+     opts:['Severe battery degradation (< 45 min playback)','One earbud stopped working entirely','Charging case failed to hold charge','Both earbuds stopped working','Physical damage (dropped / water)','Has not failed yet']},
+    {id:'EBD5',type:'radio',lbl:'Time to Failure',q:'If it failed, roughly when did this happen?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'EBD6',type:'scale',lbl:'Overall Satisfaction',
+     q:'Overall, how satisfied are you with the durability of this device?',
+     hint:'Drag the slider — 1 = fell apart quickly, 10 = exceeded expectations.',
+     min:1,max:10,step:1,minLbl:'Fell apart quickly',maxLbl:'Exceeded expectations',
+     ticks:['1','2','3','4','5','6','7','8','9','10'],
+     readoutFn:v=>{
+       if(v<=2)return'Very dissatisfied — failed much sooner than expected';
+       if(v<=4)return'Dissatisfied — durability was below expectations';
+       if(v<=6)return'Neutral — about what was expected at this price';
+       if(v<=8)return'Satisfied — lasted reasonably well';
+       return'Very satisfied — surprisingly durable for the price';
+     }},
+    /* NEW SCALE */
+    {id:'EBD7',type:'scale',lbl:'Moisture Exposure',
+     q:'How frequently do these earbuds face moisture, like a tough gym workout or a rainy commute?',
+     hint:'1 = strictly dry environments, 5 = daily heavy sweat or rain.',
+     min:1,max:5,step:1,minLbl:'Always dry',maxLbl:'Heavy daily exposure',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Never — strictly dry environments';
+       if(v===2)return'Rarely — occasional light moisture';
+       if(v===3)return'Sometimes — regular light workouts';
+       if(v===4)return'Often — heavy workouts or regular rain';
+       return'Constantly — intense daily sweat or water exposure';
+     }},
+  ]},
+
+  /* ② OVER-EAR HEADPHONES */
+  {id:'headphones',name:'Over-Ear Headphones',icon:'🎤',
+   why:'Deep focus sessions, coding marathons, library study blocks',
+   fail:'Hinge breakage · Earpad peeling · One channel dying',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you purchase this device?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'Approximately how much did you pay?',
+     opts:['Under ₹500','₹500 – ₹999','₹1,000 – ₹1,999','₹2,000 – ₹3,000']},
+    {id:'HP2',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Sony','JBL','Boat','Noise','Zebronics','OneOdio','Philips','Sennheiser','Other / Local Brand']},
+    {id:'HP3',type:'radio',lbl:'Current Status',q:'Current status of this device?',
+     opts:['Still working perfectly','Working but degraded','Broken / Failed','Lost','Replaced / Upgraded']},
+    {id:'HP4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Physical hinge breakage (cups rotate freely)','Earpad material peeling / cracking','One audio channel died (internal wiring)','Headband snapped or broke','Cable fraying (wired models)','Bluetooth connectivity failure','Has not failed yet']},
+    {id:'HP5',type:'radio',lbl:'Time to Failure',q:'If it failed, roughly when did this happen?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'HP6',type:'scale',lbl:'Build Quality Rating',
+     q:'How would you rate the physical build quality of this device?',
+     hint:'Drag the slider — assess hinges, headband flex, earpad stitching.',
+     min:1,max:10,step:1,minLbl:'Flimsy & cheap',maxLbl:'Tank-like construction',
+     ticks:['1','2','3','4','5','6','7','8','9','10'],
+     readoutFn:v=>{
+       if(v<=3)return'Poor build — feels fragile';
+       if(v<=6)return'Acceptable build — serviceable';
+       if(v<=8)return'Good build quality — solid materials';
+       return'Excellent build — premium feel';
+     }},
+    /* NEW SCALE */
+    {id:'HP7',type:'scale',lbl:'Headband Stress',
+     q:'When you put these on, how far do you typically have to stretch the headband?',
+     hint:'1 = barely flexed, 5 = stretched to the absolute limit.',
+     min:1,max:5,step:1,minLbl:'Barely flexed',maxLbl:'Max stretch',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Very loose — minimal tension on hinges';
+       if(v===3)return'Moderate stretch — average head size tension';
+       if(v===5)return'Extreme stretch — maximum strain on the plastic band';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ③ CHARGING CABLES */
+  {id:'cables',name:'Charging Cables',icon:'🔌',
+   why:'Phones, tablets, accessories — yanked from sockets and crammed into bags daily',
+   fail:'Fraying at connector neck · Internal breakage · Bent pins',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this cable?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹100','₹100 – ₹299','₹300 – ₹599','₹600 – ₹1,000']},
+    {id:'CBL2',type:'radio',lbl:'Brand',q:'Which brand is this cable?',
+     opts:['Anker','Belkin','Portronics','boAt','Mivi','Syska','Local / Unnamed Brand','Original OEM (came with device)']},
+    {id:'CBL3',type:'radio',lbl:'Current Status',q:'Current status of this cable?',
+     opts:['Working perfectly','Working but visibly fraying / damaged','Intermittent — must be held at exact angle','Completely dead','Replaced']},
+    {id:'CBL4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Fraying at connector neck (near plug head)','Fraying at the brick / port end','Internal wire breakage — intermittent charging','Bent or broken connector pins','Connector completely snapped off','Has not failed yet']},
+    {id:'CBL5',type:'radio',lbl:'Time to Failure',q:'When did the failure occur?',
+     opts:['Within 1 month','1–3 months','3–6 months','6–12 months','After 1 year','Has not failed yet']},
+    {id:'CBL6',type:'scale',lbl:'Daily Plug / Unplug Cycles',
+     q:'How many times per day do you plug and unplug this cable on average?',
+     min:1,max:20,step:1,minLbl:'~1× per day',maxLbl:'20+ times daily',
+     ticks:['1','5','10','15','20'],unit:'×/day',
+     readoutFn:v=>{
+       if(v<=5)return'Minimal cycling — low mechanical stress';
+       if(v<=10)return'Moderate cycling — typical daily use';
+       if(v<=15)return'High cycling — regular commuter';
+       return'Very high cycling — extreme stress';
+     }},
+    /* NEW SCALE */
+    {id:'CBL7',type:'scale',lbl:'Cable Bend Stress',
+     q:'How often does this cable get sharply bent or tightly wrapped at the connector base?',
+     hint:'1 = kept perfectly straight, 5 = constantly bent at sharp 90-degree angles.',
+     min:1,max:5,step:1,minLbl:'Straight/Flat',maxLbl:'Sharply bent',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Never — cable is treated very gently';
+       if(v===3)return'Sometimes — occasional tight bends in a bag';
+       if(v===5)return'Constantly — regularly kinked while charging in bed/couch';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ④ WIRELESS MOUSE */
+  {id:'wmouse',name:'Wireless / BT Mouse',icon:'🖱️',
+   why:'Laptop productivity in cafés, libraries, cramped hostel desks',
+   fail:'Double-click bug · Scroll wheel jumping · Bluetooth drops',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this mouse?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹300','₹300 – ₹599','₹600 – ₹999','₹1,000 – ₹2,000','Over ₹2,000']},
+    {id:'WM2',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Logitech','Dell','HP','Redgear','Ant Esports','Zebronics','Frontech','iBall','Other / Local Brand']},
+    {id:'WM3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:['Working perfectly','Working with minor issues','Broken / unusable','Replaced / Upgraded']},
+    {id:'WM4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Double-click bug (single click registers twice)','Scroll wheel jumping / stuttering','Bluetooth or dongle connectivity drops persistently','Left or right button physical failure','Physical damage (dropped)','Battery compartment cracked / broke','Has not failed yet']},
+    {id:'WM5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'WM6',type:'scale',lbl:'Daily Active Hours',
+     q:'On a typical day, how many hours is this mouse in active use?',
+     min:1,max:12,step:1,minLbl:'< 1 hr / day',maxLbl:'12 hrs / day',
+     ticks:['1','3','6','9','12'],unit:'hrs',
+     readoutFn:v=>{
+       if(v<=3)return'Light use — low click volume';
+       if(v<=6)return'Moderate use — office workload';
+       if(v<=9)return'Heavy use — extended sessions';
+       return'Extreme use — maximum switch stress';
+     }},
+    /* NEW SCALE */
+    {id:'WM7',type:'scale',lbl:'Click Force Intensity',
+     q:'How would you describe your typical click intensity during your daily tasks?',
+     hint:'1 = feather-light taps, 5 = heavy, forceful clicks.',
+     min:1,max:5,step:1,minLbl:'Light taps',maxLbl:'Forceful clicks',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Feather-light — minimal switch degradation';
+       if(v===3)return'Normal pressure — standard usage';
+       if(v===5)return'Heavy pressure — fast-tracking microswitch wear';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑤ WIRED GAMING MOUSE */
+  {id:'gwmouse',name:'Wired Gaming Mouse',icon:'🎮',
+   why:'CS students, gamers, engineers — zero latency, no battery anxiety',
+   fail:'Cable fraying at chassis · Sensor tracking issues · Button failure',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this mouse?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹300','₹300 – ₹599','₹600 – ₹999','₹1,000 – ₹2,000','Over ₹2,000']},
+    {id:'GWM1',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Logitech','Ant Esports','Redgear','HyperX','Cosmic Byte','HP','Dell','iBall','Other / Local Brand']},
+    {id:'GWM3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:['Working perfectly','Working with issues','Broken / unusable','Replaced / Upgraded']},
+    {id:'GWM4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Cable fraying where it meets the mouse chassis','Sensor tracking issues / stuttering / skipping','Left or right button mushy / failed','Side buttons stopped registering','Physical cable damage elsewhere (bent, cut)','Scroll wheel failure','Has not failed yet']},
+    {id:'GWM5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'GWM6',type:'scale',lbl:'Gaming Hours',
+     q:'How many hours per day is this actively used for intense gaming?',
+     min:1,max:12,step:1,minLbl:'< 1 hr / day',maxLbl:'12+ hrs',
+     ticks:['1','3','6','9','12'],unit:'hrs',
+     readoutFn:v=>{
+       if(v<=3)return'Casual gamer — low stress';
+       if(v<=6)return'Regular gamer — moderate stress';
+       return'Hardcore gamer — extreme component wear';
+     }},
+    /* NEW SCALE (User Requested) */
+    {id:'GWM7',type:'scale',lbl:'Gaming Click Aggression',
+     q:'How would you describe your click intensity during competitive or intense gaming sessions?',
+     hint:'1 = very light tapping, 5 = aggressive/rage clicking.',
+     min:1,max:5,step:1,minLbl:'Light taps',maxLbl:'Rage clicking',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Gentle — low impact on microswitches';
+       if(v===3)return'Firm — standard competitive tension';
+       if(v===5)return'Aggressive — maximum impact force, high risk of switch failure';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑥ EXTERNAL KEYBOARD */
+  {id:'keyboard',name:'External Keyboard',icon:'⌨️',
+   why:'Long reports, code, dorm desk gaming setups',
+   fail:'Keycap stems breaking · Switch chattering · USB connector failure',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this keyboard?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹500','₹500 – ₹999','₹1,000 – ₹1,999','₹2,000 – ₹3,000','Over ₹3,000']},
+    {id:'KB2',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Keychron','Cosmic Byte','Ant Esports','Redgear','Zebronics','iBall','TVS-e','HP','Portronics','Other / Local Brand']},
+    {id:'KB3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:['Working perfectly','Working with issues','Broken / unusable','Replaced / Upgraded']},
+    {id:'KB4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:["Keycap stem(s) snapped — wobbling or detached caps","Specific switch(es) chattering / double-registering","USB connector failed or became very loose","One or more keys stopped responding entirely","Key legends faded completely (cosmetic only)","Spill damage","Has not failed yet"]},
+    {id:'KB5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'KB6',type:'scale',lbl:'Daily Typing Volume',
+     q:'How many hours per day do you actively type on this keyboard?',
+     min:1,max:12,step:1,minLbl:'< 1 hr typing',maxLbl:'12 hrs typing',
+     ticks:['1','3','6','9','12'],unit:'hrs',
+     readoutFn:v=>{
+       if(v<=3)return'Light typist — minimal wear';
+       if(v<=6)return'Moderate typist — typical student workload';
+       return'Heavy typist — coder or writer, high actuation count';
+     }},
+    /* NEW SCALE */
+    {id:'KB7',type:'scale',lbl:'Keystroke Force',
+     q:'How much force do you typically apply to the keys while typing up a storm?',
+     hint:'1 = very light touch, 5 = heavy bottoming-out / hammering.',
+     min:1,max:5,step:1,minLbl:'Light touch',maxLbl:'Heavy hammering',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Very light — hovering over the keys';
+       if(v===3)return'Moderate — normal tactile feedback';
+       if(v===5)return'Hammering — aggressively bottoming out every key';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑦ USB-C HUB */
+  {id:'hub',name:'USB-C Hub / Dongle',icon:'🔗',
+   why:'Modern laptops have 1–2 ports — hubs link monitors, mice, and drives simultaneously',
+   fail:'Overheating failure · Individual port dying · Connecting cable fraying',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this hub?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹500','₹500 – ₹999','₹1,000 – ₹1,999','₹2,000 – ₹3,000','Over ₹3,000']},
+    {id:'HUB1',type:'radio',lbl:'Brand',q:'Which brand is this hub?',
+     opts:['Anker','Ugreen','Belkin','Lapcare','HP','Dell','Portronics','Local / Unnamed Brand']},
+    {id:'HUB3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:['Working perfectly — all ports functional','Working but 1 or more ports have died','Overheating issues but still functional','Completely failed — device unrecognized','Replaced / Upgraded']},
+    {id:'HUB4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Overheating leading to total shutdown or failure','HDMI port stopped working','USB-A port(s) stopped working','USB-C passthrough or data port failed','Main connecting cable frayed or snapped','Entire hub became unrecognized by laptop','Has not failed yet']},
+    {id:'HUB5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'HUB6',type:'scale',lbl:'Thermal Concern Level',
+     q:'How concerned are you about this hub overheating during use?',
+     min:1,max:10,step:1,minLbl:'Never warm',maxLbl:'Dangerously hot',
+     ticks:['1','2','3','4','5','6','7','8','9','10'],
+     readoutFn:v=>{
+       if(v<=3)return'No concern — runs cool';
+       if(v<=7)return'Noticeable heat — getting worried';
+       return'Alarming heat — potential fire risk';
+     }},
+    /* NEW SCALE */
+    {id:'HUB7',type:'scale',lbl:'Cable Torsion Stress',
+     q:'How often does this hub get moved around or left dangling off the edge of a desk while heavy cords are plugged into it?',
+     hint:'1 = sits perfectly flat and still, 5 = constantly dangling or twisted in a bag.',
+     min:1,max:5,step:1,minLbl:'Always flat/static',maxLbl:'Constantly dangling',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Static — zero strain on the connecting cable';
+       if(v===3)return'Moderate — occasional movement on the desk';
+       if(v===5)return'High strain — weight of cables pulling down on the connector';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑧ POWER BANK */
+  {id:'powerbank',name:'Portable Power Bank',icon:'🔋',
+   why:'Surviving long campus days without hunting for a wall outlet',
+   fail:'Capacity degradation · USB port breaking inward · Battery swelling',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this power bank?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹500','₹500 – ₹999','₹1,000 – ₹1,499','₹1,500 – ₹2,500','Over ₹2,500']},
+    {id:'PB1',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Mi (Xiaomi)','Syska','Romoss','Ambrane','Realme','boAt','Portronics','URBN','Local / Unnamed Brand']},
+    {id:'PB3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:["Working perfectly — charges as expected","Noticeably reduced capacity (charges less than rated)","Can only charge phone to ~50% when fully charged itself","Completely dead — won't power on","Physically swollen (deformed body)","Replaced / Upgraded"]},
+    {id:'PB4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:["Battery capacity degradation (can't fully charge phone anymore)","USB-A output port broke inward or became loose","USB-C port damaged / won't connect properly","Physical battery swelling (deformation)","Micro-USB input port failed","Device stopped powering on entirely","Has not failed yet"]},
+    {id:'PB5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'PB6',type:'scale',lbl:'Estimated Remaining Capacity',
+     q:'If you still use this, what percentage of its original capacity do you estimate it retains today?',
+     min:10,max:100,step:5,minLbl:'~10% — almost dead',maxLbl:'100% — full capacity',
+     ticks:['10%','25%','50%','75%','100%'],unit:'%',
+     readoutFn:v=>{
+       if(v<=30)return'Severe degradation — needs replacement';
+       if(v<=60)return'Moderate degradation — noticeable loss';
+       return'Good capacity retention';
+     }},
+    /* NEW SCALE */
+    {id:'PB7',type:'scale',lbl:'Thermal Abuse',
+     q:'How often is this power bank exposed to extreme environmental heat, like being left in a car during the summer or sitting in direct sunlight?',
+     hint:'Lithium batteries degrade fast in high heat.',
+     min:1,max:5,step:1,minLbl:'Never',maxLbl:'Frequently',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Never — strictly kept at room temperature';
+       if(v===3)return'Sometimes — occasionally left in a warm bag';
+       if(v===5)return'Frequently — left in hot cars or sun regularly';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑨ SMARTWATCH / FITNESS BAND */
+  {id:'smartwatch',name:'Smartwatch / Fitness Band',icon:'⌚',
+   why:'Step tracking, gym workouts, checking notifications in class',
+   fail:'Silicone strap tearing · Screen cracking from gym impact · Battery not lasting a day',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this smartwatch or fitness band?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹1,000','₹1,000 – ₹1,999','₹2,000 – ₹2,999','₹3,000 – ₹5,000','Over ₹5,000']},
+    {id:'SW2',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['Fire-Boltt','boAt','Fastrack','Realme','Noise','Amazfit','Mi Band / Xiaomi','Fitbit','Other Brand']},
+    {id:'SW3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:["Working perfectly","Working but battery barely lasts a full day","Screen cracked but otherwise functional","Strap broken (replaced or not yet)","Completely non-functional","Replaced / Upgraded"]},
+    {id:'SW4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['Silicone strap tearing or breaking at attachment point','Screen cracked from a drop or gym impact','Battery life degraded to under 1 day','Touchscreen became unresponsive','Water damage despite claimed water resistance','Charging contacts corroded or stopped making contact','Has not failed yet']},
+    {id:'SW5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'SW6',type:'scale',lbl:'Daily Wear Hours',
+     q:'On a typical day, how many hours do you wear this device?',
+     min:1,max:24,step:1,minLbl:'< 1 hr / day',maxLbl:'Worn 24/7',
+     ticks:['1','6','12','18','24'],unit:'hrs',
+     readoutFn:v=>{
+       if(v<=10)return'Part-time wear — low sensor/battery stress';
+       if(v<=16)return'Daytime wear — standard usage';
+       return'24/7 wear — maximum battery cycle usage';
+     }},
+    /* NEW SCALE */
+    {id:'SW7',type:'scale',lbl:'Impact Frequency',
+     q:'How frequently does the face of this watch experience accidental physical impacts, like bumping into doorframes or scraping against walls?',
+     hint:'1 = very careful/rarely hit, 5 = constantly banged against things.',
+     min:1,max:5,step:1,minLbl:'Rarely',maxLbl:'Constantly',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Very safe — rarely sustains impacts';
+       if(v===3)return'Normal wear — occasional light bumps';
+       if(v===5)return'High risk — constantly knocked against hard surfaces';
+       return'Between levels';
+     }},
+  ]},
+
+  /* ⑩ USB FLASH DRIVE */
+  {id:'usbdrive',name:'USB Flash Drive',icon:'💾',
+   why:'Print shops, sharing datasets, backing up assignments before exams',
+   fail:'Connector bent in backpack · Sliding mechanism broke · Drive corrupted / unreadable',
+   questions:[
+    {id:'C1',type:'date',lbl:'Purchase Date',q:'When did you buy this flash drive?'},
+    {id:'C2',type:'radio',lbl:'Price Paid',q:'How much did you pay?',
+     opts:['Under ₹200','₹200 – ₹499','₹500 – ₹999','₹1,000 – ₹2,000','Over ₹2,000']},
+    {id:'FD1',type:'radio',lbl:'Brand',q:'Which brand?',
+     opts:['SanDisk','Kingston','Samsung','Transcend','HP','Strontium','Lapcare','Local / Unnamed Brand']},
+    {id:'FD3',type:'radio',lbl:'Current Status',q:'Current status?',
+     opts:['Working perfectly','Working but slow or occasional errors','Partially readable (some files inaccessible)','Completely unrecognized by computers','Physically damaged connector or body','Lost it']},
+    {id:'FD4',type:'radio',lbl:'Failure Mode',q:'If it failed, what was the primary failure mode?',
+     opts:['USB connector physically bent in backpack','Sliding / retractable mechanism broke — connector stuck','Drive became corrupted or unreadable by any computer','Severe slow read/write speed degradation','Drive completely snapped from cap or body','Has not failed yet']},
+    {id:'FD5',type:'radio',lbl:'Time to Failure',q:'When did failure occur?',
+     opts:['Within 3 months','3–6 months','6–12 months','1–2 years','After 2+ years','Has not failed yet']},
+    {id:'FD6',type:'scale',lbl:'Safe Eject Compliance',
+     q:'What percentage of the time do you properly eject this drive before removing it?',
+     min:0,max:100,step:5,minLbl:'Never eject safely',maxLbl:'Always safely eject',
+     ticks:['0%','25%','50%','75%','100%'],unit:'%',
+     readoutFn:v=>{
+       if(v<=25)return'High corruption risk — rarely safely ejected';
+       if(v<=75)return'Moderate risk — inconsistent habits';
+       return'Safe — excellent data protection habits';
+     }},
+    /* NEW SCALE */
+    {id:'FD7',type:'scale',lbl:'Physical Mobility Risk',
+     q:'How frequently is this little drive tossed around loosely in bags, pockets, or dangling on keychains without a protective cap?',
+     hint:'1 = sits safely on a desk, 5 = goes everywhere exposed.',
+     min:1,max:5,step:1,minLbl:'Always protected',maxLbl:'Highly exposed',
+     ticks:['1','2','3','4','5'],
+     readoutFn:v=>{
+       if(v===1)return'Protected — kept safe in a specific compartment or on desk';
+       if(v===3)return'Moderate exposure — sometimes loose in a bag';
+       if(v===5)return'High exposure — always rattling around with keys or coins';
+       return'Between levels';
+     }},
+  ]},
+];
+
+/* ══ BUILD DEVICE GRID ══ */
+const grid=document.getElementById('devGrid');
+DEVICES.forEach((d,i)=>{
+  const card=document.createElement('div');
+  card.className='dev-card will-reveal';
+  card.dataset.id=d.id;
+  card.style.transitionDelay=(i*35)+'ms';
+  card.innerHTML=`<div class="dev-card-glow"></div><div class="dev-check">✓</div>
+    <span class="dev-ico">${d.icon}</span>
+    <div class="dev-name">${d.name}</div>
+    <div class="dev-why">${d.why}</div>
+    <div class="dev-fail"><div class="dev-fail-lbl">Common failure modes</div>${d.fail}</div>`;
+  card.addEventListener('click',()=>{card.classList.toggle('sel');updateSel()});
+  card.addEventListener('mousemove',e=>{
+    const r=card.getBoundingClientRect();
+    card.style.setProperty('--gx',((e.clientX-r.left)/r.width*100)+'%');
+    card.style.setProperty('--gy',((e.clientY-r.top)/r.height*100)+'%');
+  });
+  grid.appendChild(card);obs.observe(card);
+});
+
+function updateSel(){
+  const n=document.querySelectorAll('.dev-card.sel').length;
+  document.getElementById('cntBadge').textContent=n+' selected';
+  document.getElementById('surveyBtn').disabled=n===0;
+  document.getElementById('helperTxt').textContent=n===0?'Select at least one device':'Ready — click to begin';
+}
+function goToSel(){document.getElementById('sel-page').scrollIntoView({behavior:'smooth'})}
+/* ══ DEMOGRAPHICS LOGIC ══ */
+let globalDemographics = {};
+
+function goToDemo() {
+  document.getElementById('demo-page').scrollIntoView({behavior:'smooth'});
+}
+
+// Logic to smoothly expand/collapse the "Other" text fields
+document.querySelectorAll('input[name="demo-gender"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const wrap = document.getElementById('wrap-gender-other');
+    if(e.target.value === 'Other') wrap.classList.add('active');
+    else wrap.classList.remove('active');
+  });
+});
+
+document.querySelectorAll('input[name="demo-occ"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    const wrap = document.getElementById('wrap-occ-other');
+    if(e.target.value === 'Other') wrap.classList.add('active');
+    else wrap.classList.remove('active');
+  });
+});
+
+// Save demographic data and move to the device selection page
+// Save demographic data and move to the device selection page
+async function saveDemoAndGoToSel() {
+  const emailVal = document.getElementById('demo-email').value.trim();
+  const errEl = document.getElementById('email-error');
+  errEl.style.display = 'none';
+
+  // 1. Strict Regex Format Validation
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(emailVal)) {
+    errEl.textContent = '⚠️ Please enter a valid email address.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // 2. Immediate Browser Duplicate Lock Check
+  const usedEmails = JSON.parse(localStorage.getItem('uhrs_emails') || '[]');
+  if (usedEmails.includes(emailVal)) {
+    errEl.textContent = '⚠️ A survey has already been submitted using this email.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  // 3. (Optional) Supabase Strict Database Check 
+  // If you added an 'email' column to your Supabase table, uncomment below:
+  /*
+  if (typeof supabase !== 'undefined') {
+    const { data, error } = await supabase.from('survey_responses').select('id').eq('email', emailVal);
+    if (data && data.length > 0) {
+      errEl.textContent = '⚠️ This email is already registered in our database.';
+      errEl.style.display = 'block';
+      return;
+    }
+  }
+  */
+
+  const ageEl = document.querySelector('input[name="demo-age"]:checked');
+  const genderEl = document.querySelector('input[name="demo-gender"]:checked');
+  const occEl = document.querySelector('input[name="demo-occ"]:checked');
+
+  let finalGender = genderEl ? genderEl.value : '';
+  if (finalGender === 'Other') finalGender = document.getElementById('demo-gender-other').value.trim() || 'Other';
+
+  let finalOcc = occEl ? occEl.value : '';
+  if (finalOcc === 'Other') finalOcc = document.getElementById('demo-occ-other').value.trim() || 'Other';
+
+  // Store data globally
+  globalDemographics = {
+    name: document.getElementById('demo-name').value.trim(),
+    email: emailVal,
+    age_bracket: ageEl ? ageEl.value : '',
+    gender: finalGender,
+    occupation: finalOcc,
+    nationality: document.getElementById('demo-nat').value.trim()
+  };
+
+  goToSel();
+}
+/* ══ SURVEY FLOW ══ */
+let queue=[],responses={};
+function startSurveys(){
+  queue=Array.from(document.querySelectorAll('.dev-card.sel')).map(c=>DEVICES.find(d=>d.id===c.dataset.id));
+  responses={};showTransition(0);
+}
+
+/* ── TRANSITION ── */
+function showTransition(i){
+  const d=queue[i];
+  const ov=document.getElementById('t-overlay'),em=document.getElementById('t-emoji'),
+        nm=document.getElementById('t-name'),sb=document.getElementById('t-sub');
+  const rings=[document.getElementById('tr1'),document.getElementById('tr2'),document.getElementById('tr3')];
+  nm.textContent=d.name;sb.textContent='Survey '+(i+1)+' of '+queue.length;
+  em.style.animation='none';em.textContent=d.icon;
+  nm.style.opacity='0';nm.style.transform='translateY(14px)';
+  sb.style.opacity='0';sb.style.transform='translateY(10px)';
+  rings.forEach(r=>{r.style.animation='none';r.style.opacity='0'});
+  ov.style.opacity='0';ov.style.display='flex';ov.classList.add('on');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    ov.style.transition='opacity .35s ease';ov.style.opacity='1';
+    setTimeout(()=>{em.style.animation='emojiBoom .65s cubic-bezier(.34,1.56,.64,1) forwards'},200);
+    rings.forEach((r,ri)=>setTimeout(()=>{r.style.animation=`ringBurst .9s ${ri*.12}s ease-out forwards`},220));
+    setTimeout(()=>{nm.style.transition='opacity .45s ease,transform .45s ease';nm.style.opacity='1';nm.style.transform='translateY(0)'},380);
+    setTimeout(()=>{sb.style.transition='opacity .4s ease,transform .4s ease';sb.style.opacity='1';sb.style.transform='translateY(0)'},500);
+    setTimeout(()=>{
+      ov.style.opacity='0';
+      setTimeout(()=>{ov.style.display='none';ov.classList.remove('on');renderSurvey(i)},400);
+    },2000);
+  }));
+}
+
+/* ── RENDER SURVEY ── */
+function renderSurvey(i){
+  const d=queue[i],total=queue.length,pct=Math.round((i/total)*100);
+  document.getElementById('hero').style.display='none';
+  document.getElementById('sel-page').style.display='none';
+  document.getElementById('surv-page').style.display='block';
+  window.scrollTo({top:0,behavior:'instant'});
+  const wrap=document.getElementById('survWrap');
+  const nextLabel=i+1<total?'Next up: '+queue[i+1].name+' '+queue[i+1].icon:'Last survey — submitting completes the study';
+  wrap.innerHTML=`
+    <div class="surv-prog-bar">
+      <span class="prog-lbl">DEVICE ${i+1} / ${total}</span>
+      <div class="prog-track"><div class="prog-fill" style="width:${pct}%"></div></div>
+      <span class="prog-pct">${pct}%</span>
+    </div>
+    <div class="dev-header">
+      <div class="dev-hdr-ico">${d.icon}</div>
+      <div><div class="dev-hdr-name">${d.name}</div><div class="dev-hdr-meta">${d.questions.length} questions &nbsp;·&nbsp; ~3 min</div></div>
+    </div>
+    <div class="q-list">${d.questions.map((q,qi)=>buildQ(d.id,q,qi)).join('')}</div>
+    <div class="sub-area">
+      <div class="sub-note">${nextLabel}</div>
+      <button class="sub-btn" onclick="submitDev(${i})">${i+1<total?'Save & Next →':'🎉 Complete Survey'}</button>
+    </div>`;
+  wrap.querySelectorAll('.q-block').forEach((b,bi)=>setTimeout(()=>b.classList.add('in'),bi*55+150));
+  // Init all sliders in this survey
+  wrap.querySelectorAll('.scale-track-container').forEach(tc=>initSlider(tc));
+}
+
+/* ── BUILD QUESTION ── */
+function buildQ(devId,q){
+  const name=`${devId}_${q.id}`;
+  let input='';
+  if(q.type==='radio'){
+    input=`<div class="radio-group">${q.opts.map(o=>`<label class="r-opt"><input type="radio" name="${name}" value="${o}"><div class="r-dot"></div><span>${o}</span></label>`).join('')}</div>`;
+  } else if(q.type==='checkbox'){
+    input=`<div class="chk-group">${q.opts.map(o=>`<label class="c-opt"><input type="checkbox" name="${name}" value="${o}"><div class="c-box"></div><span>${o}</span></label>`).join('')}</div>`;
+  } else if(q.type==='date'){
+    const mo=MONTHS.map((m,mi)=>`<option value="${mi+1}">${m}</option>`).join('');
+    const yr=YEARS.map(y=>`<option value="${y}">${y}</option>`).join('');
+    input=`<div class="date-row"><select class="d-sel" name="${name}_month"><option value="">Month</option>${mo}</select><select class="d-sel" name="${name}_year"><option value="">Year</option>${yr}</select></div>`;
+  } else if(q.type==='scale'){
+    const mid=Math.round((q.min+q.max)/2);
+    const tickHtml=q.ticks.map(t=>`<div class="scale-tick-item"><div class="scale-tick-line"></div><div class="scale-tick-label">${t}</div></div>`).join('');
+    input=`<div class="scale-wrap">
+      <div class="scale-track-container" data-name="${name}" data-min="${q.min}" data-max="${q.max}" data-step="${q.step}" data-unit="${q.unit||''}">
+        <div class="scale-fill" style="width:0%"></div>
+        <div class="scale-thumb" style="left:0%"></div>
+        <div class="scale-bubble">—</div>
+      </div>
+      <div class="scale-ticks">${tickHtml}</div>
+      <div class="scale-ends"><span class="scale-end">${q.minLbl}</span><span class="scale-end">${q.maxLbl}</span></div>
+      <div class="scale-readout" id="ro_${name}">Drag the slider to rate</div>
+      <input type="hidden" name="${name}" value="">
+    </div>`;
+  }
+  return `<div class="q-block">
+    <div class="q-mono">${q.lbl}</div>
+    <div class="q-main">${q.q}</div>
+    ${q.hint?`<div class="q-hint">${q.hint}</div>`:''}
+    ${input}
+    <hr class="q-divider">
+  </div>`;
+}
+
+/* ══════════════════════════════════════
+   INTERACTIVE SLIDER ENGINE
+   - Grows track + thumb on mousedown/touchstart
+   - Shrinks back on mouseup/touchend
+   - Smooth drag, works mouse + touch
+══════════════════════════════════════ */
+function initSlider(tc){
+  const fill=tc.querySelector('.scale-fill');
+  const thumb=tc.querySelector('.scale-thumb');
+  const bubble=tc.querySelector('.scale-bubble');
+  const hidden=tc.parentElement.querySelector('input[type=hidden]');
+  const roEl=document.getElementById('ro_'+tc.dataset.name);
+
+  const min=parseFloat(tc.dataset.min);
+  const max=parseFloat(tc.dataset.max);
+  const step=parseFloat(tc.dataset.step);
+  const unit=tc.dataset.unit||'';
+  const devId=tc.dataset.name.split('_')[0];
+  const qId=tc.dataset.name.split('_')[1];
+  const device=DEVICES.find(d=>d.id===devId);
+  const qDef=device?.questions.find(q=>q.id===qId);
+
+  let active=false,currentVal=null;
+
+  // Find tick items for highlight
+  const tickItems=tc.parentElement.querySelectorAll('.scale-tick-item');
+
+  function snap(raw){
+    const steps=Math.round((raw-min)/step);
+    return Math.min(max,Math.max(min,min+steps*step));
+  }
+  function pct(v){return((v-min)/(max-min)*100)}
+
+  function setVal(v){
+    currentVal=v;
+    const p=pct(v);
+    fill.style.width=p+'%';
+    thumb.style.left=p+'%';
+    const disp=Number.isInteger(v)?v:v.toFixed(1);
+    bubble.textContent=disp+(unit?' '+unit:'');
+    if(hidden)hidden.value=v;
+    // Tick highlight
+    tickItems.forEach((ti,idx)=>{
+      const tickVal=parseFloat(tc.parentElement.querySelector('.scale-ticks').children[idx]?.querySelector('.scale-tick-label')?.textContent||'0');
+      ti.classList.toggle('active',v>=tickVal);
+    });
+    // Readout
+    if(roEl&&qDef?.readoutFn){
+      roEl.textContent=qDef.readoutFn(v);
+      roEl.classList.add('lit');
+    }
+    // Cursor
+    cur.classList.add('drag');ring.classList.add('drag');
+  }
+
+  function getValFromEvent(e){
+    const r=tc.getBoundingClientRect();
+    const clientX=e.touches?e.touches[0].clientX:e.clientX;
+    const raw=min+((clientX-r.left)/r.width)*(max-min);
+    return snap(raw);
+  }
+
+  function startDrag(e){
+    e.preventDefault();
+    active=true;
+    tc.classList.add('active');
+    cur.classList.add('drag');ring.classList.add('drag');
+    setVal(getValFromEvent(e));
+  }
+  function onDrag(e){
+    if(!active)return;
+    e.preventDefault();
+    setVal(getValFromEvent(e));
+  }
+  function endDrag(){
+    if(!active)return;
+    active=false;
+    tc.classList.remove('active');
+    cur.classList.remove('drag');ring.classList.remove('drag');
+  }
+
+  // Mouse
+  tc.addEventListener('mousedown',startDrag);
+  window.addEventListener('mousemove',onDrag);
+  window.addEventListener('mouseup',endDrag);
+  // Touch
+  tc.addEventListener('touchstart',startDrag,{passive:false});
+  window.addEventListener('touchmove',onDrag,{passive:false});
+  window.addEventListener('touchend',endDrag);
+}
+
+/* ── SUBMIT ── */
+function submitDev(i){
+  const d=queue[i];responses[d.id]={};
+  document.querySelectorAll(`[name^="${d.id}_"]`).forEach(el=>{
+    const k=el.name;
+    if(el.type==='radio'&&el.checked)responses[d.id][k]=el.value;
+    else if(el.type==='checkbox'&&el.checked){if(!responses[d.id][k])responses[d.id][k]=[];responses[d.id][k].push(el.value)}
+    else if(el.tagName==='SELECT'&&el.value)responses[d.id][k]=el.value;
+    else if(el.type==='hidden'&&el.value)responses[d.id][k]=el.value;
+  });
+  if(i+1<queue.length)showTransition(i+1);else showDone();
+}
+
+// --- DATABASE INITIALIZATION ---
+// Replace these with your actual keys from the Supabase Dashboard > Settings > API
+const supabaseUrl = 'https://mtbmzfmuymjlaiokcigs.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im10Ym16Zm11eW1qbGFpb2tjaWdzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA0MjEwNjYsImV4cCI6MjA5NTk5NzA2Nn0.PJtuGUs5YT5wtqJN8ogSrP7bKJxEm7Vk3qg7iSGlHno';
+const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : null;
+
+async function showDone(){
+  document.getElementById('surv-page').style.display='none';
+  const dp=document.getElementById('done-page');dp.style.display='flex';
+  window.scrollTo({top:0,behavior:'instant'});
+  document.getElementById('doneChips').innerHTML=queue.map(d=>`<div class="done-chip">${d.icon} ${d.name}</div>`).join('');
+  
+  // 1. Lock the email in the browser to prevent re-submission
+  if (globalDemographics && globalDemographics.email) {
+    const used = JSON.parse(localStorage.getItem('uhrs_emails') || '[]');
+    if (!used.includes(globalDemographics.email)) {
+      used.push(globalDemographics.email);
+      localStorage.setItem('uhrs_emails', JSON.stringify(used));
+    }
+  }
+
+  // 2. Prepare the data payload (combining devices + your new demographics)
+  const payloadToInsert = Object.entries(responses).map(([deviceId, answers]) => {
+    return {
+      device_type: deviceId,
+      payload: answers,
+      demographics: globalDemographics // This attaches the name, age, email, etc.
+    };
+  });
+
+  // 3. Push to Supabase Database
+  try {
+    if (supabase && supabaseUrl !== 'YOUR_SUPABASE_PROJECT_URL') {
+      const { error } = await supabase.from('survey_responses').insert(payloadToInsert);
+      if (error) throw error;
+      console.log('Data successfully securely written to PostgreSQL Database!');
+    } else {
+      // Fallback if you haven't pasted your API keys yet
+      console.log('Database not linked yet. Payload generated:', JSON.stringify(payloadToInsert, null, 2));
+    }
+  } catch (err) {
+    console.error('Error saving data to Supabase:', err);
+  }
+}
+
+/* ══ SCROLL REVEAL ══ */
+window.addEventListener('scroll',()=>{
+  document.querySelectorAll('.will-reveal').forEach(el=>{const r=el.getBoundingClientRect();if(r.top<window.innerHeight*.92)el.classList.add('revealed')});
+});
+setTimeout(()=>{document.querySelectorAll('.will-reveal').forEach(el=>{const r=el.getBoundingClientRect();if(r.top<window.innerHeight*.95)el.classList.add('revealed')})},200);
+</script>
+</body>
+</html>
