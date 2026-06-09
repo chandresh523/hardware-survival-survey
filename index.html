@@ -424,6 +424,10 @@ section{position:relative;z-index:2}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+  if (history.scrollRestoration) {
+  history.scrollRestoration = 'manual';
+}
+window.scrollTo(0, 0);
 /* ══ CURSOR ══ */
 /* ══ CURSOR ══ */
 const cur = document.getElementById('cur');
