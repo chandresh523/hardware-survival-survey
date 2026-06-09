@@ -853,8 +853,22 @@ function showOnly(id) {
 let isTransitioning = false;
 function goToDemo() {
   if (isTransitioning) return;
-  isTransitioning = true;
 
+  // 📱 MOBILE OVERRIDE: Native smooth scroll
+  if (window.innerWidth <= 768) {
+    const dp = document.getElementById('demo-page');
+    dp.style.display = 'block'; // Make the next page visible below
+    
+    // Tiny delay to let the browser render the new page before scrolling
+    setTimeout(() => {
+      dp.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      document.querySelectorAll('#demo-page .will-reveal').forEach(el => el.classList.add('revealed'));
+    }, 40);
+    return;
+  }
+
+  // 💻 DESKTOP ANIMATION
+  isTransitioning = true;
   const ov = document.getElementById('morph-overlay');
   const cv = document.getElementById('morphCanvas');
   const ctx = cv.getContext('2d');
@@ -867,7 +881,6 @@ function goToDemo() {
   const startTime = performance.now();
   const duration = 1100;
 
-  // Scatter hero elements
   const heroEl = document.querySelector('#hero > div');
   if(heroEl){
     heroEl.style.transition = 'transform .6s cubic-bezier(.4,0,1,1), opacity .5s ease';
@@ -882,29 +895,23 @@ function goToDemo() {
     const easeMid = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
     ctx.clearRect(0,0,W,H);
-
-    // Background fade-in
     ctx.fillStyle = `rgba(3,2,10,${easeIn * 0.92})`;
     ctx.fillRect(0,0,W,H);
 
-    // Ripple rings expanding from click center
     const numRings = 5;
     for(let r=0;r<numRings;r++){
       const phase = (p + r / numRings) % 1;
       const radius = phase * Math.hypot(W,H) * 0.85;
       const alpha = (1 - phase) * 0.22 * (1 - easeIn * 0.4);
       const hue = [
-        `rgba(184,0,255,${alpha})`,
-        `rgba(0,240,255,${alpha*0.8})`,
-        `rgba(255,0,60,${alpha*0.6})`,
-        `rgba(184,0,255,${alpha*0.7})`,
+        `rgba(184,0,255,${alpha})`,`rgba(0,240,255,${alpha*0.8})`,
+        `rgba(255,0,60,${alpha*0.6})`,`rgba(184,0,255,${alpha*0.7})`,
         `rgba(0,240,255,${alpha*0.5})`
       ][r];
       ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2);
       ctx.strokeStyle = hue; ctx.lineWidth = 1.5 + (1-phase)*4; ctx.stroke();
     }
 
-    // Flowing plasma waves
     for(let band = 0; band < 3; band++){
       const yBase = cy + (band-1) * H * 0.35;
       const waveAmp = (1-easeMid) * 60 + 20;
@@ -921,7 +928,6 @@ function goToDemo() {
       ctx.lineWidth = 1.5; ctx.stroke();
     }
 
-    // Central vortex glow
     const vortexR = easeMid * 220;
     const grd = ctx.createRadialGradient(cx,cy,0,cx,cy,vortexR);
     grd.addColorStop(0,`rgba(184,0,255,${easeMid*0.25})`);
@@ -932,7 +938,6 @@ function goToDemo() {
 
     if(p < 1){ raf = requestAnimationFrame(drawMorph); }
     else {
-      // Show label
       lbl.style.animation='none'; void lbl.offsetWidth;
       lbl.style.animation='morphLabelIn .6s cubic-bezier(.22,1,.36,1) forwards';
       setTimeout(()=>{
@@ -954,24 +959,37 @@ function goToDemo() {
 /* ══════════════════════════════════════
    TRANSITION 2 — GLITCH SHATTER (Demo → Selection)
 ══════════════════════════════════════ */
+/* ══════════════════════════════════════
+   TRANSITION 2 — GLITCH SHATTER (Demo → Selection)
+══════════════════════════════════════ */
 function goToSel() {
+  // Prevent double-tap crashes on mobile
+  if (isTransitioning) return;
+  isTransitioning = true;
+
+  // 💻 & 📱 PLAYS ON ALL DEVICES (It is CSS-based and safe for mobile!)
   const ov=document.getElementById('glitch-overlay'),gGrid=document.getElementById('glitchGrid'),
         scan=document.getElementById('glitchScan'),rR=document.getElementById('grR'),
         rG=document.getElementById('grG'),rB=document.getElementById('grB'),lbl=document.getElementById('glitchLabel');
+  
   gGrid.innerHTML='';
   const COLS=8,ROWS=6,cells=[];
   for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
     const div=document.createElement('div'); div.className='glitch-cell';
     gGrid.appendChild(div); cells.push({el:div,col:c,row:r});
   }
+  
   ov.classList.add('active');
   scan.style.top='0';scan.style.opacity='1';scan.style.transition='top .22s linear,opacity .1s';
   setTimeout(()=>{scan.style.top='100%'},20); setTimeout(()=>{scan.style.opacity='0'},220);
+  
   function flashLine(el,top,delay){
     setTimeout(()=>{el.style.top=top;el.style.opacity='1';setTimeout(()=>{el.style.transition='opacity .08s';el.style.opacity='0'},60+Math.random()*80)},delay);
   }
+  
   for(let i=0;i<6;i++){flashLine(rR,(10+Math.random()*80)+'%',80+i*45);flashLine(rG,(20+Math.random()*60)+'%',110+i*40);flashLine(rB,(5+Math.random()*90)+'%',95+i*50);}
   setTimeout(()=>{lbl.style.opacity='1';lbl.style.transition='opacity .15s'},250);
+  
   setTimeout(()=>{
     cells.forEach((cell,idx)=>{
       const delay=idx*8+Math.random()*60,dx=(cell.col-COLS/2)*(8+Math.random()*18),dy=(cell.row-ROWS/2)*(8+Math.random()*18),rot=(Math.random()-.5)*25;
@@ -983,14 +1001,19 @@ function goToSel() {
       },delay);
     });
   },300);
+  
   setTimeout(()=>{
     lbl.style.opacity='0'; ov.classList.remove('active');
     cells.forEach(c=>{c.el.style.transition='none';c.el.style.transform='';c.el.style.opacity='1';c.el.style.borderColor='';c.el.style.background='';});
+    
     showOnly('sel-page');
     const sp=document.getElementById('sel-page');
     sp.classList.remove('do-morph-enter','do-glitch-enter'); void sp.offsetWidth;
     sp.classList.add('do-glitch-enter');
     document.querySelectorAll('#sel-page .will-reveal').forEach(el=>el.classList.add('revealed'));
+    
+    // Unlock the transition so other buttons work again
+    isTransitioning = false;
   },780);
 }
 
