@@ -275,6 +275,10 @@ section{position:relative;z-index:2}
 .other-wrap{overflow:hidden;max-height:0;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1),opacity 0.3s ease;opacity:0}
 .other-wrap.active{max-height:120px;opacity:1}
 #demo-page{padding:7rem 2rem 5rem;min-height:100vh}
+@media (max-width: 768px) {
+  #cur, #cur-ring { display: none !important; }
+  * { cursor: auto !important; }
+}
 </style>
 </head>
 <body>
@@ -421,13 +425,26 @@ section{position:relative;z-index:2}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* ══ CURSOR ══ */
+/* ══ CURSOR ══ */
 const cur = document.getElementById('cur');
 const ring = document.getElementById('cur-ring');
 let mx = -100, my = -100, rx = -100, ry = -100;
-document.addEventListener('mousemove', e => {
-  mx = e.clientX; my = e.clientY;
+
+function updateCursorPos(x, y) {
+  mx = x; my = y;
   cur.style.left = mx + 'px'; cur.style.top = my + 'px';
-});
+}
+
+document.addEventListener('mousemove', e => updateCursorPos(e.clientX, e.clientY));
+
+// Add smooth tracking for mobile touch
+document.addEventListener('touchmove', e => updateCursorPos(e.touches[0].clientX, e.touches[0].clientY), {passive: true});
+document.addEventListener('touchstart', e => {
+  updateCursorPos(e.touches[0].clientX, e.touches[0].clientY);
+  cur.classList.add('drag'); ring.classList.add('drag');
+  setTimeout(() => { cur.classList.remove('drag'); ring.classList.remove('drag'); }, 200);
+}, {passive: true});
+
 (function lerpRing() {
   rx += (mx - rx) * 0.13; ry += (my - ry) * 0.13;
   ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
@@ -829,7 +846,11 @@ function showOnly(id) {
    Smooth rippling wave from center, elements
    scatter outward then morph into new page
 ══════════════════════════════════════ */
+let isTransitioning = false;
 function goToDemo() {
+  if (isTransitioning) return;
+  isTransitioning = true;
+
   const ov = document.getElementById('morph-overlay');
   const cv = document.getElementById('morphCanvas');
   const ctx = cv.getContext('2d');
@@ -919,6 +940,7 @@ function goToDemo() {
         dp.classList.remove('do-morph-enter','do-glitch-enter');
         void dp.offsetWidth; dp.classList.add('do-morph-enter');
         document.querySelectorAll('#demo-page .will-reveal').forEach(el=>el.classList.add('revealed'));
+        isTransitioning = false;
       }, 600);
     }
   }
