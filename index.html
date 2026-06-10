@@ -882,7 +882,7 @@ function showOnly(id) {
    Scroll progress 0→1 maps directly to the full animation sequence.
    Mobile: button-only, no scroll-driven animation.
 ═══════════════════════════════════════════════════════════════════ */
-const IS_DESKTOP = window.matchMedia('(hover:hover) and (pointer:fine)').matches && window.innerWidth >= 900;
+const IS_DESKTOP = true;
 
 /* ── Tunnel canvas ── */
 const tunnelCv = document.getElementById('tunnelCanvas');
@@ -1250,8 +1250,6 @@ function goToDemo(){
 }
 
 function goToDemoMobile() {
-  
-
   const ov = document.getElementById('morph-overlay');
   const cv = document.getElementById('morphCanvas');
   const ctx = cv.getContext('2d');
@@ -1261,13 +1259,13 @@ function goToDemoMobile() {
   cv.width = window.innerWidth; cv.height = window.innerHeight;
   const W = cv.width, H = cv.height;
   const cx = W/2, cy = H/2;
-  const startTime = performance.now();
   const duration = 1100;
+  
+  // FIX: Start as null. We will lock the time on the exact first frame.
+  let startTime = null; 
 
-  // Scatter hero elements with a high-speed motion blur
   const heroEl = document.querySelector('#hero > div');
   if(heroEl){
-    // Add 'filter' to the transition and use a sharper easing curve
     heroEl.style.transition = 'transform .7s cubic-bezier(.55,.085,.68,.53), opacity .5s ease-in, filter .6s ease-in';
     heroEl.style.transform = 'scale(0.5) translateY(-60px) skewX(8deg)';
     heroEl.style.opacity = '0';
@@ -1276,6 +1274,9 @@ function goToDemoMobile() {
 
   let raf;
   function drawMorph(ts){
+    // FIX: Lock the start time perfectly with the browser's render clock
+    if (!startTime) startTime = ts; 
+    
     const p = Math.min((ts - startTime) / duration, 1);
     const easeIn = p * p * p;
     const easeMid = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
@@ -1286,7 +1287,7 @@ function goToDemoMobile() {
     ctx.fillStyle = `rgba(3,2,10,${easeIn * 0.92})`;
     ctx.fillRect(0,0,W,H);
 
-    // Ripple rings expanding from click center
+    // Ripple rings
     const numRings = 5;
     for(let r=0;r<numRings;r++){
       const phase = (p + r / numRings) % 1;
@@ -1331,13 +1332,13 @@ function goToDemoMobile() {
 
     if(p < 1){ raf = requestAnimationFrame(drawMorph); }
     else {
-      // Show label
       lbl.style.animation='none'; void lbl.offsetWidth;
       lbl.style.animation='morphLabelIn .6s cubic-bezier(.22,1,.36,1) forwards';
       setTimeout(()=>{
         ov.classList.remove('active');
         lbl.style.animation='none';
-        if(heroEl){ heroEl.style.transition=''; heroEl.style.transform=''; heroEl.style.opacity=''; }
+        // FIX: Also clear the blur filter upon reset
+        if(heroEl){ heroEl.style.transition=''; heroEl.style.transform=''; heroEl.style.opacity=''; heroEl.style.filter=''; }
         showOnly('demo-page');
         const dp = document.getElementById('demo-page');
         dp.classList.remove('do-morph-enter','do-glitch-enter');
