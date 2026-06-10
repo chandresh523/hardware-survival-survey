@@ -939,21 +939,29 @@ function applyHeroTransforms(p){
   hRefs.forEach(r=>{
     if(!r.el) return;
     if(p<0.18){
+      // Phase 1: Unhinge (Slight blur as it detaches)
       const t=eOut(ph(p,0,0.18));
       r.el.style.transform=`translate(${r.dx*t*.45}px,${r.dy*t*.45}px) rotate(${r.rot*t}deg) scale(${1-t*.08})`;
       r.el.style.opacity=1;
+      r.el.style.filter=`blur(${t*3}px)`; 
     } else if(p<0.42){
+      // Phase 2: Warp (Aggressive blur as it accelerates)
       const t=eIn(ph(p,0.18,0.42));
       const sc=.92*(1-t*.73);
       r.el.style.transform=`translate(${r.dx*.45*(1-t*.93)}px,${r.dy*.45*(1-t*.93)}px) rotate(${r.rot*(1-t*.8)}deg) scale(${Math.max(0,sc)})`;
       r.el.style.opacity=1-t*.38;
+      r.el.style.filter=`blur(${3 + t*8}px)`;
     } else if(p<0.60){
+      // Phase 3: Deep Dive (Maximum blur before vanishing)
       const t=eIn(ph(p,0.42,0.60));
       r.el.style.transform=`translate(${r.dx*.05*(1-t)}px,${r.dy*.05*(1-t)}px) scale(${Math.max(0,.92*.27*(1-t))})`;
       r.el.style.opacity=Math.max(0,1-t*1.4);
+      r.el.style.filter=`blur(${11 + t*10}px)`;
     } else {
+      // Phase 4: Gone
       r.el.style.opacity=0;
       r.el.style.transform='scale(0)';
+      r.el.style.filter='blur(0px)';
     }
   });
 }
@@ -1257,12 +1265,14 @@ function goToDemoMobile() {
   const startTime = performance.now();
   const duration = 1100;
 
-  // Scatter hero elements
+  // Scatter hero elements with a high-speed motion blur
   const heroEl = document.querySelector('#hero > div');
   if(heroEl){
-    heroEl.style.transition = 'transform .6s cubic-bezier(.4,0,1,1), opacity .5s ease';
-    heroEl.style.transform = 'scale(.85) translateY(-30px)';
+    // Add 'filter' to the transition and use a sharper easing curve
+    heroEl.style.transition = 'transform .7s cubic-bezier(.55,.085,.68,.53), opacity .5s ease-in, filter .6s ease-in';
+    heroEl.style.transform = 'scale(0.5) translateY(-60px) skewX(8deg)';
     heroEl.style.opacity = '0';
+    heroEl.style.filter = 'blur(16px)';
   }
 
   let raf;
