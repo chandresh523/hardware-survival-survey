@@ -279,12 +279,40 @@ section{position:relative;z-index:2}
   #cur, #cur-ring { display: none !important; }
   * { cursor: auto !important; }
 }
+
+/* ── DESKTOP SCROLL TUNNEL ── */
+#tunnelCanvas{position:fixed;inset:0;z-index:50;pointer-events:none;opacity:0;will-change:opacity;}
+.dsk #scroll-driver{position:relative;}
+.dsk #hero{position:sticky;top:0;height:100vh;overflow:hidden;}
+@media(max-width:900px){.hero-scroll-hint{display:none}}
+
+/* ── PAGE EXPLOSION & POOF TEXT ENTRANCE ── */
+@keyframes pageExplosion{
+  0%  {opacity:0;transform:scale(.05);filter:blur(22px)}
+  52% {opacity:1;transform:scale(1.04);filter:blur(0)}
+  76% {transform:scale(.975)}
+  100%{transform:scale(1)}
+}
+@keyframes poofEnter{
+  0%  {opacity:0;transform:scale(0) rotate(-6deg);filter:blur(5px)}
+  42% {opacity:1;transform:scale(1.12) rotate(1.5deg);filter:blur(0)}
+  70% {transform:scale(.96)}
+  100%{opacity:1;transform:scale(1) rotate(0)}
+}
+.page-explosion{
+  animation:pageExplosion .82s cubic-bezier(.22,1,.36,1) both;
+  transform-origin:50% 42%;
+}
+.poof-enter{
+  animation:poofEnter .6s cubic-bezier(.34,1.56,.64,1) forwards!important;
+}
 </style>
 </head>
 <body>
 <div id="cur"></div>
 <div id="cur-ring"></div>
 <canvas id="bgCanvas"></canvas>
+<canvas id="tunnelCanvas"></canvas>
 
 <div id="t-overlay">
   <div class="t-burst">
@@ -313,6 +341,7 @@ section{position:relative;z-index:2}
   <div class="glitch-label" id="glitchLabel">LOADING DEVICE DATABASE...</div>
 </div>
 
+<div id="scroll-driver">
 <section id="hero">
   <div style="position:relative;z-index:2">
     <div class="hero-pill"><span class="hero-pill-dot"></span>SDG 12 · Responsible Consumption &amp; Production</div>
@@ -329,6 +358,7 @@ section{position:relative;z-index:2}
   </div>
   <div class="hero-scroll-hint"><div class="scroll-track"></div><span>scroll</span></div>
 </section>
+</div><!-- /scroll-driver -->
 
 <section id="demo-page" style="display:none;">
   <div class="wrap" style="max-width:650px;">
@@ -838,11 +868,362 @@ function lsSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e)
 
 /* ══ NAVIGATION ══ */
 function showOnly(id) {
-  ['hero','demo-page','sel-page','surv-page','done-page'].forEach(s => {
-    const el = document.getElementById(s);
-    if(el) el.style.display = (s === id) ? (s === 'done-page' ? 'flex' : 'block') : 'none';
+  const driver=document.getElementById('scroll-driver');
+  if(driver) driver.style.display=(id==='hero')?'':'none';
+  ['demo-page','sel-page','surv-page','done-page'].forEach(s=>{
+    const el=document.getElementById(s);
+    if(el) el.style.display=(s===id)?(s==='done-page'?'flex':'block'):'none';
   });
-  window.scrollTo({top: 0, behavior: 'instant'});
+  window.scrollTo({top:0,behavior:'instant'});
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DESKTOP SCROLL TUNNEL — 6-PHASE SCRUBBED ANIMATION (Lusion-style)
+   Scroll progress 0→1 maps directly to the full animation sequence.
+   Mobile: button-only, no scroll-driven animation.
+═══════════════════════════════════════════════════════════════════ */
+const IS_DESKTOP = window.matchMedia('(hover:hover) and (pointer:fine)').matches && window.innerWidth >= 900;
+
+/* ── Tunnel canvas ── */
+const tunnelCv = document.getElementById('tunnelCanvas');
+const tctx = tunnelCv ? tunnelCv.getContext('2d') : null;
+let tw = window.innerWidth, th = window.innerHeight;
+if(tunnelCv){ tunnelCv.width=tw; tunnelCv.height=th; }
+window.addEventListener('resize',()=>{
+  tw=window.innerWidth; th=window.innerHeight;
+  if(tunnelCv){ tunnelCv.width=tw; tunnelCv.height=th; }
+});
+
+/* ── Hero element scatter trajectories ── */
+const HERO_TARGETS=[
+  {sel:'.hero-pill',           dx:-160, dy: -90, rot:-18},
+  {sel:'.h1-line:first-child', dx:-210, dy: -70, rot:-13},
+  {sel:'.h1-accent',           dx: 230, dy: -55, rot: 15},
+  {sel:'.h1-dim',              dx:  20, dy: 105, rot:  6},
+  {sel:'.hero-desc',           dx: 130, dy: 160, rot:-10},
+  {sel:'.hero-cta',            dx:-110, dy: 190, rot: 11},
+  {sel:'.hero-scroll-hint',    dx:   0, dy: 220, rot:  0},
+];
+let hRefs=[];
+function initHeroRefs(){
+  hRefs=HERO_TARGETS.map(t=>({el:document.querySelector(t.sel),...t})).filter(r=>r.el);
+  hRefs.forEach(r=>{
+    r.el.style.willChange='transform,opacity';
+    const rect=r.el.getBoundingClientRect();
+    r.baseX=rect.left+rect.width/2;
+    r.baseY=rect.top+rect.height/2;
+    r.baseW=Math.max(rect.width,40);
+    r.baseH=Math.max(rect.height,18);
+  });
+}
+
+/* ── Easing helpers ── */
+function ph(p,a,b){ return Math.max(0,Math.min(1,(p-a)/(b-a))); }
+function eOut(t){ return 1-Math.pow(1-t,3); }
+function eIn(t) { return t*t*t; }
+function eSo(t) { return t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2; }
+
+/* ── Animation state ── */
+let scrollP=0, tClock=0, lastRafTs=0, heroTransDone=false;
+let warpDroplets=[], lastSpawnP=-1;
+
+/* ──────────────────────────────────────────────────────────────
+   DOM transforms — driven entirely by scrollP (0→1)
+
+   Phase 0.00–0.18  UNHINGE   each element breaks free
+   Phase 0.18–0.42  WARP      converge toward vanishing point
+   Phase 0.42–0.60  DEEP DIVE tiny, fading to zero
+   Phase 0.60+      GONE      opacity 0 / scale 0
+────────────────────────────────────────────────────────────── */
+function applyHeroTransforms(p){
+  hRefs.forEach(r=>{
+    if(!r.el) return;
+    if(p<0.18){
+      const t=eOut(ph(p,0,0.18));
+      r.el.style.transform=`translate(${r.dx*t*.45}px,${r.dy*t*.45}px) rotate(${r.rot*t}deg) scale(${1-t*.08})`;
+      r.el.style.opacity=1;
+    } else if(p<0.42){
+      const t=eIn(ph(p,0.18,0.42));
+      const sc=.92*(1-t*.73);
+      r.el.style.transform=`translate(${r.dx*.45*(1-t*.93)}px,${r.dy*.45*(1-t*.93)}px) rotate(${r.rot*(1-t*.8)}deg) scale(${Math.max(0,sc)})`;
+      r.el.style.opacity=1-t*.38;
+    } else if(p<0.60){
+      const t=eIn(ph(p,0.42,0.60));
+      r.el.style.transform=`translate(${r.dx*.05*(1-t)}px,${r.dy*.05*(1-t)}px) scale(${Math.max(0,.92*.27*(1-t))})`;
+      r.el.style.opacity=Math.max(0,1-t*1.4);
+    } else {
+      r.el.style.opacity=0;
+      r.el.style.transform='scale(0)';
+    }
+  });
+}
+
+/* ──────────────────────────────────────────────────────────────
+   CANVAS RENDERER — 6 phases
+
+   P 0.05–0.24  BG overlay fades in
+   P 0.10–0.72  TUNNEL: hex/oct rings, glass panels, loop brackets,
+                        chromatic speed-lines, vortex glow
+   P 0.60–0.88  STAR: multi-layer radial glow + 8 rays + pulse
+   P 0.72–0.88  TEXT: "Tell us about yourself" + sub-label
+   P 0.88–1.00  REBIRTH: expanding shockwave + FLASHBANG
+────────────────────────────────────────────────────────────── */
+function renderTunnel(p,ts){
+  if(!tctx) return;
+  const dt=Math.min((ts-lastRafTs)/1000,.05);
+  tClock+=dt; lastRafTs=ts;
+  tctx.clearRect(0,0,tw,th);
+  const cx=tw/2, cy=th/2;
+  tunnelCv.style.opacity=p>0.05?'1':'0';
+
+  /* BG */
+  const bgA=eSo(ph(p,.08,.22));
+  if(bgA>.01){ tctx.fillStyle=`rgba(3,2,10,${bgA*.94})`; tctx.fillRect(0,0,tw,th); }
+
+  /* TUNNEL */
+  const tFade=eSo(ph(p,.10,.24))*(1-eSo(ph(p,.63,.77)));
+  if(tFade>.005){
+    const speed=.25+ph(p,.18,.63)*4.2;
+    const FOV=340, NR=46, BR=Math.min(tw,th)*.37;
+    const SHAPES=[6,8,4,8,6];
+    const COLS=[[184,0,255],[0,240,255],[255,0,100]];
+    for(let i=NR-1;i>=0;i--){
+      const zN=((i/NR)+tClock*speed*.4)%1;
+      const z=zN*(FOV-20);
+      const persp=FOV/(FOV-z+8);
+      const sr=BR*persp;
+      if(sr>Math.max(tw,th)*1.7) continue;
+      const fa=(1-zN)*tFade; if(fa<.005) continue;
+      const sides=SHAPES[i%5];
+      const cc=COLS[(i+Math.floor(tClock*.5))%3];
+      tctx.beginPath();
+      for(let s=0;s<=sides;s++){
+        const ang=(s/sides)*Math.PI*2-Math.PI/sides+tClock*.12;
+        s===0?tctx.moveTo(cx+Math.cos(ang)*sr,cy+Math.sin(ang)*sr)
+             :tctx.lineTo(cx+Math.cos(ang)*sr,cy+Math.sin(ang)*sr);
+      }
+      tctx.closePath();
+      tctx.strokeStyle=`rgba(${cc[0]},${cc[1]},${cc[2]},${fa*.78})`;
+      tctx.lineWidth=Math.max(.4,persp*.55); tctx.stroke();
+      if(i%5===0&&fa>.14){ tctx.fillStyle=`rgba(${cc[0]},${cc[1]},${cc[2]},${fa*.055})`; tctx.fill(); }
+      if(i%9===0){
+        const bR=sr*1.22;
+        for(let k=0;k<4;k++){
+          const a2=(k/4)*Math.PI*2+tClock*.33;
+          tctx.beginPath(); tctx.arc(cx+Math.cos(a2)*bR,cy+Math.sin(a2)*bR,persp*4.5,0,Math.PI*2);
+          tctx.strokeStyle=`rgba(0,240,255,${fa*.42})`; tctx.lineWidth=.9; tctx.stroke();
+        }
+      }
+    }
+    /* Speed lines */
+    const dT=ph(p,.46,.65)*tFade;
+    if(dT>.01){
+      const SLC=[[255,0,60],[0,240,255],[184,0,255]];
+      for(let r=0;r<12;r++){
+        const ang=(r/12)*Math.PI*2+tClock*1.65;
+        const len=Math.min(tw,th)*.47*dT;
+        tctx.beginPath(); tctx.moveTo(cx,cy); tctx.lineTo(cx+Math.cos(ang)*len,cy+Math.sin(ang)*len);
+        tctx.strokeStyle=`rgba(${SLC[r%3][0]},${SLC[r%3][1]},${SLC[r%3][2]},${dT*.23})`;
+        tctx.lineWidth=.9; tctx.stroke();
+      }
+    }
+    /* Vortex */
+    const vg=tctx.createRadialGradient(cx,cy,0,cx,cy,115);
+    vg.addColorStop(0,`rgba(184,0,255,${tFade*.52})`);
+    vg.addColorStop(.4,`rgba(0,240,255,${tFade*.22})`);
+    vg.addColorStop(1,'transparent');
+    tctx.beginPath(); tctx.arc(cx,cy,115,0,Math.PI*2); tctx.fillStyle=vg; tctx.fill();
+  }
+
+  /* WARP DROPLETS — text melts into vortex as coloured blobs, poof-evaporate */
+  const dropPhase=ph(p,.18,.62);
+  if(hRefs.length&&dropPhase>0&&dropPhase<1){
+    if(p>lastSpawnP+.003){
+      lastSpawnP=p;
+      const budget=2+Math.floor(dropPhase*6);
+      const DCOLS=[[184,0,255],[0,240,255],[255,255,255],[255,0,100]];
+      for(let n=0;n<budget;n++){
+        const r=hRefs[Math.floor(Math.random()*hRefs.length)];
+        const wt=eIn(ph(p,.18,.42));
+        const ex=r.baseX+(r.dx*.45*(1-wt*.93));
+        const ey=r.baseY+(r.dy*.45*(1-wt*.93));
+        warpDroplets.push({
+          x:ex+(Math.random()-.5)*r.baseW*.7,
+          y:ey+(Math.random()-.5)*r.baseH*.7,
+          vx:(Math.random()-.5)*1.8, vy:-.8+Math.random()*.4,
+          r:1.8+Math.random()*4,
+          life:0, maxLife:.85+Math.random()*.85,
+          color:DCOLS[Math.floor(Math.random()*DCOLS.length)],
+          poof:false, poofR:0, poofLife:0
+        });
+      }
+      while(warpDroplets.length>220) warpDroplets.shift();
+    }
+    if(p<lastSpawnP-.06) lastSpawnP=p; // allow re-spawn if user scrolls back
+  }
+  // Physics + render (runs always so in-flight droplets can finish their poof)
+  warpDroplets=warpDroplets.filter(d=>{
+    d.life+=dt;
+    if(!d.poof){
+      const ddx=cx-d.x, ddy=cy-d.y, dist=Math.sqrt(ddx*ddx+ddy*ddy)+1;
+      const pull=(.08+dropPhase*.28)*55;
+      d.vx+=(ddx/dist)*pull*dt+(-ddy/dist)*.07*dt;  // centre pull + swirl
+      d.vy+=(ddy/dist)*pull*dt+(ddx/dist)*.07*dt+.22*dt;
+      d.vx*=.96; d.vy*=.96;
+      d.x+=d.vx; d.y+=d.vy;
+      if(d.life/d.maxLife>.7){ d.poof=true; d.poofR=d.r; d.poofLife=0; }
+    } else {
+      d.poofLife+=dt;
+      if(d.poofLife>.42) return false;
+    }
+    if(!d.poof){
+      const a=Math.max(0,1-d.life/d.maxLife)*.88;
+      if(a<.01) return true;
+      tctx.beginPath(); tctx.arc(d.x,d.y,d.r,0,Math.PI*2);
+      tctx.fillStyle=`rgba(${d.color[0]},${d.color[1]},${d.color[2]},${a})`;
+      tctx.fill();
+      const gg=tctx.createRadialGradient(d.x,d.y,0,d.x,d.y,d.r*3.2);
+      gg.addColorStop(0,`rgba(${d.color[0]},${d.color[1]},${d.color[2]},${a*.38})`);
+      gg.addColorStop(1,'transparent');
+      tctx.beginPath(); tctx.arc(d.x,d.y,d.r*3.2,0,Math.PI*2); tctx.fillStyle=gg; tctx.fill();
+    } else {
+      // POOF BUBBLE — expanding ring + shrinking inner dot
+      const pt=d.poofLife/.42;
+      const pa=Math.max(0,(1-pt)*.72);
+      tctx.beginPath(); tctx.arc(d.x,d.y,d.poofR*(1+pt*3.8),0,Math.PI*2);
+      tctx.strokeStyle=`rgba(${d.color[0]},${d.color[1]},${d.color[2]},${pa})`;
+      tctx.lineWidth=1.3; tctx.stroke();
+      tctx.beginPath(); tctx.arc(d.x,d.y,d.poofR*(1-pt*.9),0,Math.PI*2);
+      tctx.fillStyle=`rgba(255,255,255,${pa*.55})`; tctx.fill();
+    }
+    return true;
+  });
+
+  /* STAR */
+  const stA=eSo(ph(p,.60,.73))*(1-eSo(ph(p,.83,.91)));
+  if(stA>.005){
+    if(tFade<.1&&bgA<.4){ tctx.fillStyle=`rgba(3,2,10,${stA*.93})`; tctx.fillRect(0,0,tw,th); }
+    const pulse=.9+.1*Math.sin(tClock*14);
+    [[100,.12],[60,.27],[30,.53],[12,.83],[4,1]].forEach(([r,a])=>{
+      const g=tctx.createRadialGradient(cx,cy,0,cx,cy,r*stA*pulse);
+      g.addColorStop(0,`rgba(255,255,255,${a*stA})`);
+      g.addColorStop(.35,`rgba(184,0,255,${a*.66*stA})`);
+      g.addColorStop(1,'transparent');
+      tctx.beginPath(); tctx.arc(cx,cy,r*stA*pulse,0,Math.PI*2); tctx.fillStyle=g; tctx.fill();
+    });
+    for(let ray=0;ray<8;ray++){
+      const ang=(ray/8)*Math.PI*2+tClock*.56;
+      const len=65*stA*pulse*(.7+.3*Math.sin(tClock*6+ray*1.3));
+      tctx.beginPath(); tctx.moveTo(cx,cy); tctx.lineTo(cx+Math.cos(ang)*len,cy+Math.sin(ang)*len);
+      tctx.strokeStyle=`rgba(255,255,255,${.28*stA})`; tctx.lineWidth=1; tctx.stroke();
+    }
+  }
+
+  /* TEXT */
+  const txA=eSo(ph(p,.72,.83))*(1-eIn(ph(p,.85,.92)));
+  if(txA>.005){
+    tctx.save(); tctx.globalAlpha=txA;
+    const fs=Math.max(22,Math.min(52,tw*.046));
+    tctx.font=`800 ${fs}px Syne,sans-serif`;
+    tctx.fillStyle='#00f0ff'; tctx.textAlign='center'; tctx.textBaseline='middle';
+    tctx.shadowColor='#00f0ff'; tctx.shadowBlur=26*txA;
+    tctx.fillText('Tell us about yourself',cx,cy);
+    tctx.font=`400 ${Math.max(11,tw*.013)}px DM Mono,monospace`;
+    tctx.fillStyle=`rgba(184,0,255,${txA})`; tctx.shadowColor='rgba(184,0,255,.5)'; tctx.shadowBlur=10;
+    tctx.fillText('WHO IS BEHIND THE HARDWARE?',cx,cy+fs*1.45);
+    tctx.restore();
+  }
+
+  /* REBIRTH */
+  const rbT=ph(p,.87,1);
+  if(rbT>.005){
+    const ex=eOut(rbT);
+    const rMax=Math.sqrt(tw*tw+th*th)*.63;
+    const rSize=ex*rMax;
+    const flT=ph(rbT,.5,1);
+    const rg=tctx.createRadialGradient(cx,cy,0,cx,cy,rSize);
+    rg.addColorStop(0,`rgba(255,255,255,${Math.min(1,ex*1.8)})`);
+    rg.addColorStop(.15,`rgba(184,0,255,${(1-flT)*.9})`);
+    rg.addColorStop(.4,`rgba(0,240,255,${(1-flT)*.4})`);
+    rg.addColorStop(1,'transparent');
+    tctx.beginPath(); tctx.arc(cx,cy,Math.max(1,rSize),0,Math.PI*2); tctx.fillStyle=rg; tctx.fill();
+    if(flT>.25){ tctx.fillStyle=`rgba(255,255,255,${Math.min(1,(flT-.25)/.62)})`; tctx.fillRect(0,0,tw,th); }
+    if(p>=.965&&!heroTransDone){
+      heroTransDone=true;
+      setTimeout(()=>{
+        // Fade tunnel canvas
+        tunnelCv.style.transition='opacity .4s ease';
+        tunnelCv.style.opacity='0';
+        showOnly('demo-page');
+        const dp=document.getElementById('demo-page');
+        // ── PAGE EXPLOSION: inner content blasts from tiny dot to full frame ──
+        const dw=dp.querySelector('.wrap');
+        if(dw){
+          dw.classList.remove('page-explosion');
+          void dw.offsetWidth;
+          dw.classList.add('page-explosion');
+        }
+        // ── STAGGERED POOF ENTRANCE for each text block ──
+        const revEls=Array.from(dp.querySelectorAll('.will-reveal'));
+        revEls.forEach((el,i)=>{
+          setTimeout(()=>{
+            el.classList.add('poof-enter');
+            // After poof plays: mark as revealed and remove animation class
+            setTimeout(()=>{
+              el.classList.remove('poof-enter');
+              el.classList.add('revealed');
+            },700);
+          },460+i*105);
+        });
+        isTransitioning=false;
+      },100);
+    }
+  }
+}
+
+/* ── Scroll handler (desktop) ── */
+function onHeroScroll(){
+  if(heroTransDone) return;
+  const driver=document.getElementById('scroll-driver');
+  if(!driver||driver.style.display==='none') return;
+  const scrollMax=driver.offsetHeight-window.innerHeight;
+  if(scrollMax<=0) return;
+  scrollP=Math.min(window.scrollY/scrollMax,1);
+}
+
+/* ── RAF loop ── */
+function heroRafLoop(ts){
+  if(heroTransDone) return;
+  applyHeroTransforms(scrollP);
+  renderTunnel(scrollP,ts);
+  requestAnimationFrame(heroRafLoop);
+}
+
+/* ── Smooth auto-scroll when button is clicked (desktop) ── */
+function autoScrollHero(){
+  const driver=document.getElementById('scroll-driver');
+  const target=driver.offsetHeight-window.innerHeight;
+  const start=window.scrollY;
+  const t0=performance.now();
+  const dur=3500;
+  function step(ts){
+    if(heroTransDone) return;
+    const t=Math.min((ts-t0)/dur,1);
+    const e=t<.5?2*t*t:1-Math.pow(-2*t+2,2)/2;
+    window.scrollTo(0,start+(target-start)*e);
+    if(t<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ── Bootstrap desktop system ── */
+if(IS_DESKTOP){
+  document.getElementById('scroll-driver').style.height='550vh';
+  document.documentElement.classList.add('dsk');
+  initHeroRefs();
+  window.addEventListener('scroll',onHeroScroll,{passive:true});
+  lastRafTs=performance.now();
+  requestAnimationFrame(heroRafLoop);
 }
 
 /* ══════════════════════════════════════
@@ -851,24 +1232,19 @@ function showOnly(id) {
    scatter outward then morph into new page
 ══════════════════════════════════════ */
 let isTransitioning = false;
-function goToDemo() {
+
+/* ── goToDemo: dispatch to desktop tunnel or mobile morph ── */
+function goToDemo(){
+  if(isTransitioning) return;
+  isTransitioning=true;
+  if(IS_DESKTOP){ autoScrollHero(); }
+  else { goToDemoMobile(); }
+}
+
+function goToDemoMobile() {
   if (isTransitioning) return;
-
-  // 📱 MOBILE OVERRIDE: Native smooth scroll
-  if (window.innerWidth <= 768) {
-    const dp = document.getElementById('demo-page');
-    dp.style.display = 'block'; // Make the next page visible below
-    
-    // Tiny delay to let the browser render the new page before scrolling
-    setTimeout(() => {
-      dp.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      document.querySelectorAll('#demo-page .will-reveal').forEach(el => el.classList.add('revealed'));
-    }, 40);
-    return;
-  }
-
-  // 💻 DESKTOP ANIMATION
   isTransitioning = true;
+
   const ov = document.getElementById('morph-overlay');
   const cv = document.getElementById('morphCanvas');
   const ctx = cv.getContext('2d');
@@ -881,6 +1257,7 @@ function goToDemo() {
   const startTime = performance.now();
   const duration = 1100;
 
+  // Scatter hero elements
   const heroEl = document.querySelector('#hero > div');
   if(heroEl){
     heroEl.style.transition = 'transform .6s cubic-bezier(.4,0,1,1), opacity .5s ease';
@@ -895,23 +1272,29 @@ function goToDemo() {
     const easeMid = p < 0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2;
 
     ctx.clearRect(0,0,W,H);
+
+    // Background fade-in
     ctx.fillStyle = `rgba(3,2,10,${easeIn * 0.92})`;
     ctx.fillRect(0,0,W,H);
 
+    // Ripple rings expanding from click center
     const numRings = 5;
     for(let r=0;r<numRings;r++){
       const phase = (p + r / numRings) % 1;
       const radius = phase * Math.hypot(W,H) * 0.85;
       const alpha = (1 - phase) * 0.22 * (1 - easeIn * 0.4);
       const hue = [
-        `rgba(184,0,255,${alpha})`,`rgba(0,240,255,${alpha*0.8})`,
-        `rgba(255,0,60,${alpha*0.6})`,`rgba(184,0,255,${alpha*0.7})`,
+        `rgba(184,0,255,${alpha})`,
+        `rgba(0,240,255,${alpha*0.8})`,
+        `rgba(255,0,60,${alpha*0.6})`,
+        `rgba(184,0,255,${alpha*0.7})`,
         `rgba(0,240,255,${alpha*0.5})`
       ][r];
       ctx.beginPath(); ctx.arc(cx,cy,radius,0,Math.PI*2);
       ctx.strokeStyle = hue; ctx.lineWidth = 1.5 + (1-phase)*4; ctx.stroke();
     }
 
+    // Flowing plasma waves
     for(let band = 0; band < 3; band++){
       const yBase = cy + (band-1) * H * 0.35;
       const waveAmp = (1-easeMid) * 60 + 20;
@@ -928,6 +1311,7 @@ function goToDemo() {
       ctx.lineWidth = 1.5; ctx.stroke();
     }
 
+    // Central vortex glow
     const vortexR = easeMid * 220;
     const grd = ctx.createRadialGradient(cx,cy,0,cx,cy,vortexR);
     grd.addColorStop(0,`rgba(184,0,255,${easeMid*0.25})`);
@@ -938,6 +1322,7 @@ function goToDemo() {
 
     if(p < 1){ raf = requestAnimationFrame(drawMorph); }
     else {
+      // Show label
       lbl.style.animation='none'; void lbl.offsetWidth;
       lbl.style.animation='morphLabelIn .6s cubic-bezier(.22,1,.36,1) forwards';
       setTimeout(()=>{
@@ -1022,14 +1407,7 @@ document.getElementById('startBtn').addEventListener('click', goToDemo);
 document.getElementById('demoNextBtn').addEventListener('click', saveDemoAndGoToSel);
 document.getElementById('surveyBtn').addEventListener('click', startSurveys);
 
-/* ══ SCROLL-TO-DEMO on scroll down from hero ══ */
-let heroScrollFired = false;
-window.addEventListener('scroll', () => {
-  if(!heroScrollFired && window.scrollY > 60 && document.getElementById('hero').style.display !== 'none'){
-    heroScrollFired = true;
-    goToDemo();
-  }
-});
+/* scroll-to-demo: handled by onHeroScroll (desktop) or button (mobile) */
 
 /* ══ DEMOGRAPHICS LOGIC ══ */
 document.querySelectorAll('input[name="demo-gender"]').forEach(r=>r.addEventListener('change',e=>{
